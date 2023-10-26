@@ -1,0 +1,16 @@
+Teaching team clarification on how `COUNT` and `SMOKING_HX` were calculated. Received by email 2023-10-26 07:28 AM CST.
+
+
+# `COUNT`
+
+"`COUNT` is the number of medications related to ICD-10-CM codes (E78.0, E78.0p) per participant.  RXDCOUNT is the overall number of medications reported by participants. For example, SEQN=110073 reported two cholesterol-controlling medications (Atorvastatin and Colesevelam). Many participants had one medications but some had two meds in the dataset."
+
+# `SMOKING_HX`
+
+"It was created using two variables (SMQ020 and SMQ040) to inform the quick history of cigarette smoking. Participants who refused or responded to 'don't know' were treated as missing." 
+
+"SAS codes are:
+IF SMQ020 = 1 AND SMQ040 IN (1,2) THEN SMOKING_HX = 2;
+IF SMQ020 = 1 AND SMQ040 IN (3) THEN SMOKING_HX = 1;
+IF SMQ020 = 2 THEN SMOKING_HX = 0 ; LABEL SMOKING_HX = '0-NEVER, 1-PAST, 2- CURRENT';
+If you want to create more detailed smoking variables (e.g., # of average cigarettes/day), please add [P_SMQ](https://wwwn.cdc.gov/Nchs/Nhanes/2017-2018/P_SMQ.htm#SMQ020) dataset to your working dataset. Also, please check the [CDC website](https://www.cdc.gov/nchs/nhis/tobacco/tobacco_glossary.htm) for more information" 
