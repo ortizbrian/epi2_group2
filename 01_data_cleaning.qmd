@@ -45,21 +45,20 @@ This file achieves pre-processing and cleaning of the NHANES data sets.
 
 -   Columns were reordered
 
--   Subjects with any exclusion (or lack of inclusion) criteria were flagged for exclusion in `drop_flag`
+-   Subjects with any exclusion (or lack of inclusion) criteria, or missing any value for the outcome variable were flagged for exclusion in `drop_flag`
 
 ## 🕒 Change Log
 
 **2023-11-06**, file initialized. Data sets cleaned, filtered, and merged into a single data set for analysis.
 
+**2023-11-08**, revised drop criteria
+
 # 📦 Load packages & Functions
 
 ```{r, message=FALSE, warning=FALSE}
 library(here, warn.conflicts = FALSE)
-library(stringr, warn.conflicts = FALSE)
-library(lubridate, warn.conflicts = FALSE)
 library(readxl, warn.conflicts = FALSE)
 library(openxlsx, warn.conflicts = FALSE)
-library(readr, warn.conflicts = FALSE)
 library(tidyverse, warn.conflicts = FALSE)
 ```
 
@@ -1338,34 +1337,103 @@ nrow(combined_data |>
 # 1
 ```
 
-We further wished to exclude anyone who had not endorsed ever being told they needed to take a prescription medication for their cholesterol. This resulted in an additional 5,290 rows excluded.
+We also assessed for subjects that lacked a value for our outcome of interest (endorsed adherence or non-adherence to prescribed lipid-lowering medication). This resulted in the exclusion of an additional 5,630 subjects.
 
 ```{r}
 combined_data <- combined_data |>
-  mutate(drop_flag = case_when(
-    !is.na(cholesterol_rx_ever) ~ TRUE,
-    !cholesterol_rx_ever ~ TRUE,
-    TRUE ~ drop_flag
-    )
-  )
-  
-nrow(combined_data |> 
-       filter(drop_flag)) - 1
-# 5,290
+  mutate(drop_flag = ifelse(is.na(adherence), TRUE, drop_flag))
+
+nrow(combined_data |>
+  filter(drop_flag)) - 1
+# 5630
 ```
 
-This has left 1,831 subjects for analysis. Due to this smaller size, the excluded rows have not been dropped, but the flag kept in the data set.
+These 1,491 remaining subjects all reported being told they needed to take a prescription medication to lower their cholesterol by a health care provider.
+
+```{r}
+unique(pull(
+  combined_data |>
+    filter(!drop_flag) |>
+    select(cholesterol_rx_ever)
+  )
+)
+# TRUE
+```
+
+We also examined for subjects that were missing our exposure of interest (family income ratio). This resuletd in a further 323 excluded subjects.
+
+```{r}
+combined_data <- combined_data |>
+  mutate(drop_flag = ifelse(is.na(income_ratio), TRUE, drop_flag))
+
+nrow(combined_data |>
+  filter(drop_flag)) - 5631
+```
+
+This has left 1,168 subjects for analysis. Due to this smaller size, the excluded rows have not been dropped, but the flag kept in the data set.
 
 ```{r}
 attributes(combined_data[['drop_flag']])$label <- paste(
   "Flag for exclusion: age < 20, cancer history, taking insulin or other",
-  "glucose lowering medications, or never told a lipid-lowering medication",
-  "was needed"
+  "glucose lowering medications, or lack of exposure or outcome variable"
 )
 
 nrow(combined_data |>
        filter(!drop_flag))
-# 1831
+# 1168
+```
+
+# Reordering Variables
+
+We reordered our combined variables into a more cohesive and logical order for human-legibility.
+
+```{r}
+combined_data <- combined_data |>
+  relocate(
+    id, drop_flag, collection_cycle, collection_lang,
+    # Inclusion/Exclusion, and Outcome
+    cholesterol_rx_ever, adherence, cancer_ever, rx_glucose_lowering,
+    cholesterol_ever, cholesterol_check_ever, cholesterol_check_last,
+    # Demographics, SES
+    age, sex, race_5cat, race_6cat, marital_status,
+    educ_level, occupation_type_week,
+    accult_birth_country, accult_time_usa,
+    # Exposure of Interest: Income
+    income_ratio, income_cat,
+    # Insurance
+    ins_dichot_original, ins_classif, ins_type, ins_any_gap,
+    ins_private, ins_govt, ins_none, ins_rx,
+    ins_govt_medicare, ins_govt_medigap, ins_govt_medicaid,
+    ins_govt_chip, ins_govt_state, ins_govt_other,
+    # Co-morbid CHD
+    cvd_hx, cvd_chf_ever, cvd_chf_age, cvd_cad_ever, cvd_cad_age, 
+    cvd_angina_ever, cvd_angina_age, cvd_mi_ever, cvd_mi_age, cvd_cva_ever, 
+    cvd_cva_age, 
+    # Alcohol
+    alc_ever, alc_freq, alc_per_day, alc_heavy,
+    # Tobacco
+    smoking_hx,
+    # Activity
+    active_mod_work_dur, active_transport_dur, active_mod_rec_dur, 
+    active_total, active_vig_dur,
+    # Weight/Obesity
+    bmi, bmi_cat, weight_self, weight_self_wish,
+    weight_need_ever, weight_need_exercise, weight_need_salt, 
+    weight_need_fat, 
+    weight_act_now, weight_act_now_exercise, weight_act_now_salt, 
+    weight_act_now_fat,  
+    weight_act_year, weight_act_year_cut, weight_act_year_calories, 
+    weight_act_year_fat, weight_act_year_exercise, weight_act_year_skip, 
+    weight_act_year_product, weight_act_year_liquid, weight_act_year_program,
+    weight_act_year_rx, weight_act_year_nonrx, weight_act_year_purge, 
+    weight_act_year_water, weight_act_year_diet, weight_act_year_carbs, 
+    weight_act_year_smoke, weight_act_year_veg, weight_act_year_habits, 
+    weight_act_year_sweets, weight_act_year_junk, weight_act_year_surgery, 
+    weight_act_year_other,
+    # RX
+    rx_use, rx_lipid, rx_count_lipid, rx_count_total, rx_statin, rx_pcks9, 
+    rx_fibrate, rx_sequestrant, rx_supplement, rx_other, rx_non_lipid
+  )
 ```
 
 ### 💾 Save the Data
