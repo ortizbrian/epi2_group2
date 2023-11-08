@@ -1,0 +1,728 @@
+---
+title: "Data Exploration"
+date: "2022-11-08 <br> Updated: `r Sys.Date()`"
+format: pdf
+editor: 
+  markdown: 
+    wrap: sentence
+---
+
+# ⭐️Overview
+
+This file seeks to perform initial exploration of the NHANES data.
+
+## 🕒 Change Log
+
+**2023-11-08**, file initialized
+
+# 📦 Load packages & Functions
+
+```{r, message=FALSE, warning=FALSE}
+library(here, warn.conflicts = FALSE)
+library(tidyverse, warn.conflicts = FALSE)
+library(mice, warn.conflicts = FALSE)
+```
+
+## 📥 Import the Data
+
+We imported our cleaned NHANES data set.
+
+```{r}
+nhanes_path <- here('data', 'combined_data.rds')
+nhanes_data <- readRDS(nhanes_path)
+
+# Print a message for when this file is being sourced
+cat(
+  paste0(Sys.Date(), ":"),
+  "NHANES data imported with", nrow(nhanes_data), "rows and", 
+  ncol(nhanes_data), "columns. \n",
+  "Data last modified: ", as.character(file.info(nhanes_path)$mtime), "\n"
+)
+
+# 2023-11-08: NHANES data imported with 7122 rows and 102 columns. 
+#  Data last modified:  2023-11-08 11:39:26 
+```
+
+# Miss-Pattern
+
+## All Subjects
+
+There was at least one missing value in 86 of our 102 variables.
+
+```{r}
+contains_na <- nhanes_data |>
+  select(where(~sum(is.na(.)) > 0)) |>
+  select(-c(
+    rx_statin, rx_pcks9, rx_fibrate, rx_sequestrant, rx_supplement,
+    rx_other, rx_non_lipid, rx_glucose_lowering
+    )) |>
+  names()
+
+length(contains_na)
+#86
+```
+
+### Administrative Variables
+
+None of the administratve variables had any missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      id, drop_flag, collection_cycle, collection_lang
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 0
+```
+### Inclusion/Exclusion Variables
+
+7 of the 8 inclusion/exclusion variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      cholesterol_rx_ever, adherence, cancer_ever, rx_glucose_lowering,
+      cholesterol_ever, cholesterol_check_ever, cholesterol_check_last,
+      age
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 7
+```
+We examined this pattern in greater detail. Age was the least missing. 
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      cholesterol_rx_ever, adherence, cancer_ever, rx_glucose_lowering,
+      cholesterol_ever, cholesterol_check_ever, cholesterol_check_last,
+      age
+    ), rotate.names = TRUE)
+```
+### Non-Insurance SES
+
+7 of the 11 non-insurance SES variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      age, sex, race_5cat, race_6cat, marital_status, educ_level, 
+      occupation_type_week, accult_birth_country, accult_time_usa, 
+      income_ratio, income_cat
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 7
+```
+
+We examined this pattern in greater detail. Marital Status, Income variables, and acculturation time were the most missing.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      age, sex, race_5cat, race_6cat, marital_status, educ_level, 
+      occupation_type_week, accult_birth_country, accult_time_usa, 
+      income_ratio, income_cat
+    ), rotate.names = TRUE)
+```
+### Insurance Status Variables
+
+All of the 14 insurance variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      ins_dichot_original, ins_classif, ins_type, ins_any_gap, ins_private, 
+      ins_govt, ins_none, ins_rx, ins_govt_medicare, ins_govt_medigap, 
+      ins_govt_medicaid, ins_govt_chip, ins_govt_state, ins_govt_other
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 14
+```
+
+We examined this pattern in greater detail. The binary flags were the most frequently missing.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      ins_dichot_original, ins_classif, ins_type, ins_any_gap, ins_private, 
+      ins_govt, ins_none, ins_rx, ins_govt_medicare, ins_govt_medigap, 
+      ins_govt_medicaid, ins_govt_chip, ins_govt_state, ins_govt_other
+    ), rotate.names = TRUE)
+```
+### Comorbid CHD Variables
+
+All of the 11 comorbid CHD variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      cvd_hx, cvd_chf_ever, cvd_chf_age, cvd_cad_ever, cvd_cad_age, 
+      cvd_angina_ever, cvd_angina_age, cvd_mi_ever, cvd_mi_age, cvd_cva_ever, 
+      cvd_cva_age
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 11
+```
+
+We examined this pattern in greater detail. The age variables were the most frequently missing.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      cvd_hx, cvd_chf_ever, cvd_chf_age, cvd_cad_ever, cvd_cad_age, 
+      cvd_angina_ever, cvd_angina_age, cvd_mi_ever, cvd_mi_age, cvd_cva_ever, 
+      cvd_cva_age
+    ), rotate.names = TRUE)
+```
+### Substance Use Variables
+
+All of the 5 substance use variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      alc_ever, alc_freq, alc_per_day, alc_heavy, smoking_hx
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 5
+```
+We examined this pattern in greater detail. Alcohol per day was the most common source variable that was missing.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      alc_ever, alc_freq, alc_per_day, alc_heavy, smoking_hx
+    ), rotate.names = TRUE)
+```
+### Physical Activity Variables
+
+All of the 5 physical activity variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      active_mod_work_dur, active_transport_dur, active_mod_rec_dur, 
+      active_total, active_vig_dur
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 5
+```
+
+We examined this pattern in greater detail. Vigorous activity and transport activity durations were the most frequently missing.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      active_mod_work_dur, active_transport_dur, active_mod_rec_dur, 
+      active_total, active_vig_dur
+    ), rotate.names = TRUE)
+```
+### BMI and Weight Perception Variables
+
+All of the 4 bmi and weight perception variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      bmi, bmi_cat, weight_self, weight_self_wish
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 4
+```
+We examined this pattern in greater detail. BMI measurement was the most frequently missing value.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      bmi, bmi_cat, weight_self, weight_self_wish
+    ), rotate.names = TRUE)
+```
+### Physician Weight Notification Variables
+
+All of the 4 physician notification of weight needs variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      weight_need_ever, weight_need_exercise, weight_need_salt, 
+      weight_need_fat
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 4
+```
+
+We examined this pattern in greater detail. No particular variable was significantly more missing than any other.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      weight_need_ever, weight_need_exercise, weight_need_salt, 
+      weight_need_fat
+    ), rotate.names = TRUE)
+```
+### Current Weight Loss Activity Variables
+
+All of the 4 current weight loss activity variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      weight_act_now, weight_act_now_exercise, weight_act_now_salt,
+      weight_act_now_fat
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 4
+```
+
+We examined this pattern in greater detail. No variable appeared to be significantly more missing than any others
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      weight_act_now, weight_act_now_exercise, weight_act_now_salt,
+      weight_act_now_fat
+    ), rotate.names = TRUE)
+```
+### Past Year Weight Loss Activity Variables
+All of the 22 past year weight-loss action variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      weight_act_year, weight_act_year_cut, weight_act_year_calories,
+      weight_act_year_fat, weight_act_year_exercise, weight_act_year_skip,
+      weight_act_year_product, weight_act_year_liquid, 
+      weight_act_year_program, weight_act_year_rx, weight_act_year_nonrx,
+      weight_act_year_purge, weight_act_year_water, weight_act_year_diet,
+      weight_act_year_carbs, weight_act_year_smoke, weight_act_year_veg,
+      weight_act_year_habits, weight_act_year_sweets, weight_act_year_junk,
+      weight_act_year_surgery, weight_act_year_other
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 22
+```
+
+We examined this pattern in greater detail. No one variable appeared to be significantly more missing than any other.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      weight_act_year, weight_act_year_cut, weight_act_year_calories,
+      weight_act_year_fat, weight_act_year_exercise, weight_act_year_skip,
+      weight_act_year_product, weight_act_year_liquid, 
+      weight_act_year_program, weight_act_year_rx, weight_act_year_nonrx,
+      weight_act_year_purge, weight_act_year_water, weight_act_year_diet,
+      weight_act_year_carbs, weight_act_year_smoke, weight_act_year_veg,
+      weight_act_year_habits, weight_act_year_sweets, weight_act_year_junk,
+      weight_act_year_surgery, weight_act_year_other
+    ), rotate.names = TRUE)
+```
+### RX Data Variables
+
+All of the 11 prescription use variables demonstrated missingness.
+
+```{r}
+length(
+  nhanes_data |>
+    select(
+      rx_use, rx_lipid, rx_count_lipid, rx_count_total, rx_statin, rx_pcks9, 
+      rx_fibrate, rx_sequestrant, rx_supplement, rx_other, rx_non_lipid
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 11
+```
+
+We examined this pattern in greater detail. The classification flags were the most frequently missing variables.
+
+```{r}
+md.pattern(nhanes_data |>
+    select(
+      rx_use, rx_lipid, rx_count_lipid, rx_count_total, rx_statin, rx_pcks9, 
+      rx_fibrate, rx_sequestrant, rx_supplement, rx_other, rx_non_lipid
+    ), rotate.names = TRUE)
+```
+
+## Included Subjects
+
+We isolated only the subjects flagged for inclusion
+
+```{r}
+included_data <- nhanes_data |>
+  filter(!drop_flag)
+```
+
+There was at least one missing value in 73 of our 102 variables.
+
+```{r}
+contains_na <- included_data |>
+  select(where(~sum(is.na(.)) > 0)) |>
+  select(-c(
+    rx_statin, rx_pcks9, rx_fibrate, rx_sequestrant, rx_supplement,
+    rx_other, rx_non_lipid, rx_glucose_lowering
+    )) |>
+  names()
+
+length(contains_na)
+#73
+```
+
+### Administrative Variables
+
+None of the administratve variables had any missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      id, drop_flag, collection_cycle, collection_lang
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 0
+```
+
+### Inclusion/Exclusion Variables
+
+7 of the 8 inclusion/exclusion variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      cholesterol_rx_ever, adherence, cancer_ever, rx_glucose_lowering,
+      cholesterol_ever, cholesterol_check_ever, cholesterol_check_last,
+      age
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 5
+```
+We examined this pattern in greater detail. The binary flag for glucose lowering medication was the most frequently missing, followed by endorsement of cholesterol ever being checked.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      cholesterol_rx_ever, adherence, cancer_ever, rx_glucose_lowering,
+      cholesterol_ever, cholesterol_check_ever, cholesterol_check_last,
+      age
+    ), rotate.names = TRUE)
+```
+
+### Non-Insurance SES
+
+2 of the 11 non-insurance SES variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      age, sex, race_5cat, race_6cat, marital_status, educ_level, 
+      occupation_type_week, accult_birth_country, accult_time_usa, 
+      income_ratio, income_cat
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 2
+```
+
+We examined this pattern in greater detail. Acculturation time was the most frequently missing.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      age, sex, race_5cat, race_6cat, marital_status, educ_level, 
+      occupation_type_week, accult_birth_country, accult_time_usa, 
+      income_ratio, income_cat
+    ), rotate.names = TRUE)
+```
+
+### Insurance Status Variables
+
+13 of the 14 insurance variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      ins_dichot_original, ins_classif, ins_type, ins_any_gap, ins_private, 
+      ins_govt, ins_none, ins_rx, ins_govt_medicare, ins_govt_medigap, 
+      ins_govt_medicaid, ins_govt_chip, ins_govt_state, ins_govt_other
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 14
+```
+
+We examined this pattern in greater detail. The binary flags were the most frequently missing.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      ins_dichot_original, ins_classif, ins_type, ins_any_gap, ins_private, 
+      ins_govt, ins_none, ins_rx, ins_govt_medicare, ins_govt_medigap, 
+      ins_govt_medicaid, ins_govt_chip, ins_govt_state, ins_govt_other
+    ), rotate.names = TRUE)
+```
+
+### Comorbid CHD Variables
+
+All of the 11 comorbid CHD variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      cvd_hx, cvd_chf_ever, cvd_chf_age, cvd_cad_ever, cvd_cad_age, 
+      cvd_angina_ever, cvd_angina_age, cvd_mi_ever, cvd_mi_age, cvd_cva_ever, 
+      cvd_cva_age
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 11
+```
+
+We examined this pattern in greater detail. The age variables were the most frequently missing.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      cvd_hx, cvd_chf_ever, cvd_chf_age, cvd_cad_ever, cvd_cad_age, 
+      cvd_angina_ever, cvd_angina_age, cvd_mi_ever, cvd_mi_age, cvd_cva_ever, 
+      cvd_cva_age
+    ), rotate.names = TRUE)
+```
+
+### Substance Use Variables
+
+4 of the 5 substance use variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      alc_ever, alc_freq, alc_per_day, alc_heavy, smoking_hx
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 4
+```
+We examined this pattern in greater detail. Alcohol per day was the most common source variable that was missing.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      alc_ever, alc_freq, alc_per_day, alc_heavy, smoking_hx
+    ), rotate.names = TRUE)
+```
+
+### Physical Activity Variables
+
+All of the 5 physical activity variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      active_mod_work_dur, active_transport_dur, active_mod_rec_dur, 
+      active_total, active_vig_dur
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 5
+```
+
+We examined this pattern in greater detail. Vigorous activity and transport activity durations were the most frequently missing.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      active_mod_work_dur, active_transport_dur, active_mod_rec_dur, 
+      active_total, active_vig_dur
+    ), rotate.names = TRUE)
+```
+
+### BMI and Weight Perception Variables
+
+3 of the 4 bmi and weight perception variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      bmi, bmi_cat, weight_self, weight_self_wish
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 3
+```
+We examined this pattern in greater detail. BMI measurement was the most frequently missing value.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      bmi, bmi_cat, weight_self, weight_self_wish
+    ), rotate.names = TRUE)
+```
+
+### Physician Weight Notification Variables
+
+2 of the 4 physician notification of weight needs variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      weight_need_ever, weight_need_exercise, weight_need_salt, 
+      weight_need_fat
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 2
+```
+
+We examined this pattern in greater detail. No particular variable was significantly more missing than any other.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      weight_need_ever, weight_need_exercise, weight_need_salt, 
+      weight_need_fat
+    ), rotate.names = TRUE)
+```
+
+### Current Weight Loss Activity Variables
+
+3 of the 4 current weight loss activity variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      weight_act_now, weight_act_now_exercise, weight_act_now_salt,
+      weight_act_now_fat
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 3
+```
+
+We examined this pattern in greater detail. No variable appeared to be significantly more missing than any others
+
+```{r}
+md.pattern(included_data |>
+    select(
+      weight_act_now, weight_act_now_exercise, weight_act_now_salt,
+      weight_act_now_fat
+    ), rotate.names = TRUE)
+```
+
+### Past Year Weight Loss Activity Variables
+
+22 of the 22 past year weight-loss action variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      weight_act_year, weight_act_year_cut, weight_act_year_calories,
+      weight_act_year_fat, weight_act_year_exercise, weight_act_year_skip,
+      weight_act_year_product, weight_act_year_liquid, 
+      weight_act_year_program, weight_act_year_rx, weight_act_year_nonrx,
+      weight_act_year_purge, weight_act_year_water, weight_act_year_diet,
+      weight_act_year_carbs, weight_act_year_smoke, weight_act_year_veg,
+      weight_act_year_habits, weight_act_year_sweets, weight_act_year_junk,
+      weight_act_year_surgery, weight_act_year_other
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 22
+```
+
+We examined this pattern in greater detail. No one variable appeared to be significantly more missing than any other.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      weight_act_year, weight_act_year_cut, weight_act_year_calories,
+      weight_act_year_fat, weight_act_year_exercise, weight_act_year_skip,
+      weight_act_year_product, weight_act_year_liquid, 
+      weight_act_year_program, weight_act_year_rx, weight_act_year_nonrx,
+      weight_act_year_purge, weight_act_year_water, weight_act_year_diet,
+      weight_act_year_carbs, weight_act_year_smoke, weight_act_year_veg,
+      weight_act_year_habits, weight_act_year_sweets, weight_act_year_junk,
+      weight_act_year_surgery, weight_act_year_other
+    ), rotate.names = TRUE)
+```
+
+### RX Data Variables
+
+All of the 11 prescription use variables demonstrated missingness.
+
+```{r}
+length(
+  included_data |>
+    select(
+      rx_use, rx_lipid, rx_count_lipid, rx_count_total, rx_statin, rx_pcks9, 
+      rx_fibrate, rx_sequestrant, rx_supplement, rx_other, rx_non_lipid
+    ) |>
+    select(where(~sum(is.na(.)) > 0))|>
+    names()
+)
+# 11
+```
+
+We examined this pattern in greater detail. The classification flags were the most frequently missing variables.
+
+```{r}
+md.pattern(included_data |>
+    select(
+      rx_use, rx_lipid, rx_count_lipid, rx_count_total, rx_statin, rx_pcks9, 
+      rx_fibrate, rx_sequestrant, rx_supplement, rx_other, rx_non_lipid
+    ), rotate.names = TRUE)
+```
+
