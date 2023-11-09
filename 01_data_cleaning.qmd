@@ -19,7 +19,7 @@ This file achieves pre-processing and cleaning of the NHANES data sets.
 
 -   Columns were converted into factors with value labels, if categorical
 
--   The two race columns were checked, and found to have different categories
+-   The two race columns were checked, and found to have different categories. These were further consolidated into an additional 2 columns, which combined "Mexican American" and "Other Hispanic" into "Hispanic".
 
 -   The two income-ratio columns were compared and found to be different, so the column with the clearest documentation in the NHANES codebooks was selected to keep
 
@@ -52,6 +52,8 @@ This file achieves pre-processing and cleaning of the NHANES data sets.
 **2023-11-06**, file initialized. Data sets cleaned, filtered, and merged into a single data set for analysis.
 
 **2023-11-08**, revised drop criteria; added BMI calculation check. Revised calculated vars to have 'FALSE' appropriately.
+
+**2023-11-09**, revised race, ensured labels appropriately added to variables.
 
 # 📦 Load packages & Functions
 
@@ -201,36 +203,6 @@ rx_data |>
 # Main NHANES Data Set
 
 ## Data Cleaning
-
-### Applying Variable Labels
-
-Variable Labels in R allow quick referencing between a column and its documentation.
-We applied these label attributes based on the labels stored in the data source documents
-
-```{r}
-# Iterate through each column in `nhanes_data`, and pull the corresponding 
-# label from the documentation (`nhanes_doc`) as its value
-for (col_name in colnames(nhanes_data)){
-  attributes(nhanes_data[[col_name]])$label <- pull(
-    nhanes_doc |>
-      filter(Variable == col_name) |>
-      select(Label)
-    )
-}
-
-# Iterate through each column in `rx_data`, and pull the corresponding 
-# label from the documentation (`rx_doc`) as its value
-for (col_name in colnames(rx_data)){
-  attributes(rx_data[[col_name]])$label <- pull(
-    rx_doc |>
-      filter(Variable == col_name) |>
-      select(Label)
-    )
-}
-
-# Purge iterative variable that is no longer necessary
-rm(col_name)
-```
 
 ### Eliminating Uninformative Values
 
@@ -772,6 +744,36 @@ colnames(nhanes_data)
 # [85] "CVD_HX"                  
 ```
 
+### Applying Variable Labels
+
+Variable Labels in R allow quick referencing between a column and its documentation.
+We applied these label attributes based on the labels stored in the data source documents
+
+```{r}
+# Iterate through each column in `nhanes_data`, and pull the corresponding 
+# label from the documentation (`nhanes_doc`) as its value
+for (col_name in colnames(nhanes_data)){
+  attributes(nhanes_data[[col_name]])$label <- pull(
+    nhanes_doc |>
+      filter(Variable == col_name) |>
+      select(Label)
+    )
+}
+
+# Iterate through each column in `rx_data`, and pull the corresponding 
+# label from the documentation (`rx_doc`) as its value
+for (col_name in colnames(rx_data)){
+  attributes(rx_data[[col_name]])$label <- pull(
+    rx_doc |>
+      filter(Variable == col_name) |>
+      select(Label)
+    )
+}
+
+# Purge iterative variable that is no longer necessary
+rm(col_name)
+```
+
 We renamed all variables in the NHANES data set, according to our style guide.
 
 ```{r}
@@ -882,6 +884,57 @@ rm(nhanes_doc)
 ```
 
 ## Calculating Variables
+
+### Race
+
+We consolidated "Mexican American" and "Other Hispanic" into a single category, from both categorizations of our race variables.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(
+    race_ethn_4cat = case_when(
+      race_5cat %in% c('Mexican American', 'Other Hispanic') ~ "Hispanic",
+      !(race_5cat %in% c('Mexican American', 'Other Hispanic')) ~ race_5cat,
+      is.na(race_5cat) ~ NA
+    ),
+    race_ethn_5cat = case_when(
+      race_6cat %in% c('Mexican American', 'Other Hispanic') ~ "Hispanic",
+      !(race_6cat %in% c('Mexican American', 'Other Hispanic')) ~ race_5cat,
+      is.na(race_6cat) ~ NA
+    )
+  ) |>
+  mutate(
+    race_ethn_4cat = factor(
+      race_ethn_4cat,
+      levels = c(
+        'Hispanic',
+        'Non-Hispanic White',
+        'Non-Hispanic Black',
+        'Other Race (including multiracial)'
+      ),
+      ordered = TRUE
+    ),
+    race_ethn_5cat = factor(
+      race_ethn_5cat,
+      levels = c(
+        'Hispanic',
+        'Non-Hispanic White',
+        'Non-Hispanic Black',
+        'Non-Hispanic Asian',
+        'Other Race (including multiracial)'
+      ),
+      ordered = TRUE
+    )
+  )
+
+attributes(nhanes_data[['race_ethn_4cat']])$label <- paste0(
+  "Race/Hispanic origin without Non-Hispanic Asian"
+  )
+  
+attributes(nhanes_data[['race_ethn_5cat']])$label <- paste0(
+  "Race/Hispanic origin with Non-Hispanic Asian"
+  )
+```
 
 ### Health Insurance
 
@@ -1461,8 +1514,8 @@ combined_data <- combined_data |>
     cholesterol_rx_ever, adherence, cancer_ever, rx_glucose_lowering,
     cholesterol_ever, cholesterol_check_ever, cholesterol_check_last,
     # Demographics, SES
-    age, sex, race_5cat, race_6cat, marital_status,
-    educ_level, occupation_type_week,
+    age, sex, race_ethn_4cat, race_ethn_5cat, race_5cat, race_6cat, 
+    marital_status, educ_level, occupation_type_week,
     accult_birth_country, accult_time_usa,
     # Exposure of Interest: Income
     income_ratio, income_cat,

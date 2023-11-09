@@ -43,8 +43,8 @@ cat(
   "Data last modified: ", as.character(file.info(nhanes_path)$mtime), "\n"
 )
 
-# 2023-11-08: NHANES data imported with 7122 rows and 103 columns. 
-#  Data last modified:  2023-11-08 17:24:31 
+# 2023-11-09: NHANES data imported with 7122 rows and 105 columns. 
+#  Data last modified:  2023-11-09 12:00:16 
 ```
 
 # All Subjects
