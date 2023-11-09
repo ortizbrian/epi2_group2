@@ -1,5 +1,5 @@
 ---
-title: "Data Exploration"
+title: "Data Exploration - Missingness"
 date: "2022-11-08 <br> Updated: `r Sys.Date()`"
 format: pdf
 editor: 
@@ -9,7 +9,7 @@ editor:
 
 # ⭐️Overview
 
-This file seeks to perform initial exploration of the NHANES data.
+This file seeks to perform initial exploration of the NHANES data, focused on missingness within the data
 
 ## 🕒 Change Log
 
@@ -39,15 +39,15 @@ cat(
   "Data last modified: ", as.character(file.info(nhanes_path)$mtime), "\n"
 )
 
-# 2023-11-08: NHANES data imported with 7122 rows and 102 columns. 
-#  Data last modified:  2023-11-08 11:39:26 
+# 2023-11-08: NHANES data imported with 7122 rows and 103 columns. 
+#  Data last modified:  2023-11-08 17:24:31 
 ```
 
 # Miss-Pattern
 
 ## All Subjects
 
-There was at least one missing value in 86 of our 102 variables.
+There was at least one missing value in 87 of our 102 variables.
 
 ```{r}
 contains_na <- nhanes_data |>
@@ -59,7 +59,7 @@ contains_na <- nhanes_data |>
   names()
 
 length(contains_na)
-#86
+#87
 ```
 
 ### Administrative Variables
@@ -134,28 +134,30 @@ md.pattern(nhanes_data |>
 ```
 ### Insurance Status Variables
 
-All of the 14 insurance variables demonstrated missingness.
+All of the 15 insurance variables demonstrated missingness.
 
 ```{r}
 length(
   nhanes_data |>
     select(
-      ins_dichot_original, ins_classif, ins_type, ins_any_gap, ins_private, 
+      ins_dichot_original, ins_dichot,
+      ins_classif, ins_type, ins_any_gap, ins_private, 
       ins_govt, ins_none, ins_rx, ins_govt_medicare, ins_govt_medigap, 
       ins_govt_medicaid, ins_govt_chip, ins_govt_state, ins_govt_other
     ) |>
     select(where(~sum(is.na(.)) > 0))|>
     names()
 )
-# 14
+# 15
 ```
 
-We examined this pattern in greater detail. The binary flags were the most frequently missing.
+We examined this pattern in greater detail. The original binary flags were the most frequently missing.
 
 ```{r}
 md.pattern(nhanes_data |>
     select(
-      ins_dichot_original, ins_classif, ins_type, ins_any_gap, ins_private, 
+      ins_dichot_original, ins_dichot,
+      ins_classif, ins_type, ins_any_gap, ins_private, 
       ins_govt, ins_none, ins_rx, ins_govt_medicare, ins_govt_medigap, 
       ins_govt_medicaid, ins_govt_chip, ins_govt_state, ins_govt_other
     ), rotate.names = TRUE)
@@ -475,13 +477,14 @@ md.pattern(included_data |>
 
 ### Insurance Status Variables
 
-13 of the 14 insurance variables demonstrated missingness.
+13 of the 15 insurance variables demonstrated missingness.
 
 ```{r}
 length(
   included_data |>
     select(
-      ins_dichot_original, ins_classif, ins_type, ins_any_gap, ins_private, 
+      ins_dichot_original, ins_dichot,
+      ins_classif, ins_type, ins_any_gap, ins_private, 
       ins_govt, ins_none, ins_rx, ins_govt_medicare, ins_govt_medigap, 
       ins_govt_medicaid, ins_govt_chip, ins_govt_state, ins_govt_other
     ) |>
@@ -496,7 +499,8 @@ We examined this pattern in greater detail. The binary flags were the most frequ
 ```{r}
 md.pattern(included_data |>
     select(
-      ins_dichot_original, ins_classif, ins_type, ins_any_gap, ins_private, 
+      ins_dichot_original, ins_dichot,
+      ins_classif, ins_type, ins_any_gap, ins_private, 
       ins_govt, ins_none, ins_rx, ins_govt_medicare, ins_govt_medigap, 
       ins_govt_medicaid, ins_govt_chip, ins_govt_state, ins_govt_other
     ), rotate.names = TRUE)
@@ -716,7 +720,7 @@ length(
 # 11
 ```
 
-We examined this pattern in greater detail. The classification flags were the most frequently missing variables.
+We examined this pattern in greater detail. The classification flags were missing for subjects that were not present in the medication subset.
 
 ```{r}
 md.pattern(included_data |>

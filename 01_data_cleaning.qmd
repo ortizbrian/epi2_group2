@@ -51,7 +51,7 @@ This file achieves pre-processing and cleaning of the NHANES data sets.
 
 **2023-11-06**, file initialized. Data sets cleaned, filtered, and merged into a single data set for analysis.
 
-**2023-11-08**, revised drop criteria
+**2023-11-08**, revised drop criteria; added BMI calculation check. Revised calculated vars to have 'FALSE' appropriately.
 
 # 📦 Load packages & Functions
 
@@ -893,7 +893,7 @@ nhanes_data <- nhanes_data |>
   mutate(
     ins_govt = ifelse( 
       (ins_govt_medicare | ins_govt_medigap | ins_govt_medicaid |
-         ins_govt_chip | ins_govt_state | ins_govt_other), TRUE, NA
+         ins_govt_chip | ins_govt_state | ins_govt_other), TRUE, FALSE
       )
     )
 
@@ -908,7 +908,11 @@ nhanes_data |>
   rowwise() |>
   mutate(n_ins = sum(ins_govt, ins_private, ins_none, na.rm = TRUE)) |>
   filter(n_ins > 1) |>
-  select(id, n_ins, ins_govt, ins_private, ins_none, ins_govt_medicaid, ins_govt_medicare, ins_govt_medigap, ins_govt_chip, ins_govt_state, ins_govt_other)
+  select(
+    id, n_ins, ins_govt, ins_private, ins_none, ins_govt_medicaid, 
+    ins_govt_medicare, ins_govt_medigap, ins_govt_chip, ins_govt_state, 
+    ins_govt_other
+    )
 ```
 
 We created a categorical variable for insurance type as an ordered factor.
@@ -987,6 +991,28 @@ nhanes_data <- nhanes_data |>
 attributes(nhanes_data[['ins_classif']])$label <- 'Total Insurance Status'
 ```
 
+We then cleaned the remaining variables for the different insurance types, so that if a subject had a form of insurance, they would indicate FALSE rather than a missing value.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(
+    ins_govt = ifelse(is.na(ins_govt) & !is.na(ins_type), FALSE, ins_govt),
+    ins_private = ifelse(is.na(ins_private) & !is.na(ins_type), 
+                         FALSE, 
+                         ins_private
+                         ),
+    ins_none = ifelse(is.na(ins_none) & ins_type == 'Uninsured', TRUE, ins_none)
+  ) |>
+  mutate(ins_dichot = case_when(
+    ins_type == 'Uninsured' ~ FALSE,
+    !is.na(ins_type) & (ins_type != 'Uninsured') ~ TRUE,
+    is.na(ins_type) ~ NA
+    )
+  )
+
+attributes(nhanes_data[['ins_dichot']])$label <- 'Any insurance'
+```
+
 ### Alcohol Use
 
 We calculated if a subject was a heavy drinker, based on [NIAAA standards](https://www.niaaa.nih.gov/alcohol-health/overview-alcohol-consumption/moderate-binge-drinking).
@@ -1003,28 +1029,31 @@ nhanes_data <- nhanes_data |>
       alc_freq == '3-4 times per week' ~ alc_per_day * 4,
       alc_freq == 'twice per week' ~ alc_per_day * 2,
       alc_freq == 'once per week' ~ alc_per_day,
+      !is.na(alc_freq) ~ alc_per_day,
       TRUE ~ NA
     )
   ) |>
-  # per week classification
+  # Classification by Gender
   mutate(
     alc_heavy = case_when(
-      sex == "Female" & alc_per_week >=8 ~ TRUE,
-      sex == "Female" & alc_per_week <8 ~ FALSE,
-      sex == "Male" & alc_per_week >=15 ~ TRUE,
-      sex == "Male" & alc_per_week <15 ~ FALSE,
+      sex == "Female" & (alc_per_week >=8 | alc_per_day >=4) ~ TRUE,
+      sex == "Female" & !(alc_per_week >=8 | alc_per_day >=4) ~ FALSE,
+      sex == "Male" & (alc_per_week >=15 |alc_per_day >= 5)~ TRUE,
+      sex == "Male" & !(alc_per_week >=15 |alc_per_day >= 5)~ FALSE,
       TRUE ~ alc_heavy
     )
   ) |>
-  # Override if per-day is over threshold, regardless of per-week
+  # If alc_freq was 'Never in last year', answer as FALSE
   mutate(
-    alc_heavy = case_when(
-      sex == "Female" & alc_per_day >= 4 ~ TRUE,
-      sex == "Female" & alc_per_day < 4 ~ FALSE,
-      sex == "Male" & alc_per_day >= 5 ~ TRUE,
-      sex == "Male" & alc_per_day < 5 ~ FALSE,
-      TRUE ~ alc_heavy
-    )
+    alc_heavy = ifelse(
+      is.na(alc_heavy) & alc_freq == "Never in last year",
+      FALSE,
+      alc_heavy
+      )
+  ) |>
+  # If alc_ever is false, should also be false
+  mutate(
+    alc_heavy = ifelse(is.na(alc_heavy) & !alc_ever, FALSE, alc_heavy)
   ) |>
   # drop the per-week value, since it's vulnerable to missingness
   select(-alc_per_week)
@@ -1057,7 +1086,9 @@ nhanes_data <- nhanes_data |>
   rename_at('income_cat_original', ~'income_cat')
 ```
 
-## Verifying Teaching Team Variable
+## Verifying Teaching Team Variables
+
+### CVD_HX
 
 We verified the Teaching Team created variable `cvd_hx` by comparing to a newly calculated version. In comparison, we were able to identify that the original `cvd_hx` variable did not appropriately account for "Yes" answers to Myocardial infarction (MI).
 
@@ -1101,6 +1132,26 @@ nhanes_data <- nhanes_data |>
     TRUE ~ NA
   ))
 ```
+
+### BMI Classification
+
+We verified the teaching team related variable classifying subject BMI values based on [CDC Classifications](https://www.cdc.gov/obesity/basics/adult-defining.html) was appropriate. 
+
+```{r}
+nrow(nhanes_data |>
+  select(bmi_cat, bmi) |>
+  mutate(bmi_cat_new = case_when(
+    is.na(bmi) ~ NA,
+    bmi < 18.5 ~ 'Underweight',
+    bmi >=18.5 & bmi <25 ~ 'Normal Weight',
+    bmi >=25 & bmi < 30 ~ 'Overweight',
+    bmi >=30 & bmi < 40 ~ 'Obese Class 1 or 2',
+    bmi >=40 ~ 'Obese Class 3'
+  )) |>
+  filter(bmi_cat != bmi_cat_new)
+) == 0
+```
+
 
 ## Checking for Duplicates
 
@@ -1252,16 +1303,7 @@ attributes(rx_data[['rx_lipid_count']])$label <- paste(
   )
 ```
 
-rx_statin = NA,
-    rx_pcks9 = NA,
-    rx_fibrate = NA,
-    rx_sequestrant = NA,
-    rx_supplement = NA,
-    rx_non_lipid = NA,
-    rx_glucose_lowering = NA,
-    rx_other = NA,
-
-We ensured each of these categories was consistent for all rows for a given `SEQN` value.
+We ensured each of these categories was consistent for all rows for a given `SEQN` value. 
 
 ```{r}
 length(unique(rx_data$SEQN)) == nrow(
@@ -1275,7 +1317,7 @@ length(unique(rx_data$SEQN)) == nrow(
   )
 ```
 
-We isolated the columns that were subject-specific, and took only a single row for each subject.
+We isolated the columns that were subject-specific, and took only a single row for each subject. We then converted any missing values into 'FALSE'.
 
 ```{r}
 rx_data <- rx_data |>
@@ -1284,7 +1326,17 @@ rx_data <- rx_data |>
     rx_pcks9, rx_fibrate, rx_sequestrant, rx_supplement, rx_other, 
     rx_non_lipid, rx_glucose_lowering
     ) |>
-  distinct()
+  distinct() |>
+  mutate(across(all_of(c(
+                'rx_lipid', 'rx_statin', 'rx_pcks9', 'rx_fibrate', 
+                'rx_sequestrant', 'rx_supplement', 'rx_other', 'rx_non_lipid', 
+                'rx_glucose_lowering'
+                )
+              ), 
+      ~replace_na(., FALSE)
+      )
+    )
+      
 ```
 
 We compared the teaching-team calculated `COUNT` to our newly created `rx_lipid_count`. We found that several non-lipid-lowering medications were counted as lipid-lowering, because of subjects that were also taking non-lipid-lowering medications or a subject reported a medication was taken for cholesterol (when it was not a medication indicated for cholesterol).
@@ -1298,6 +1350,20 @@ rx_data <- rx_data |>
     c('SEQN', 'RXDUSE', 'RXDCOUNT', 'rx_lipid_count'),
     ~c('id', 'rx_use', 'rx_count_total', 'rx_count_lipid'))
 ```
+
+We converted the binary `rx_use` into a logical/boolean.
+
+```{r}
+rx_data <- rx_data |>
+  mutate(
+    rx_use = case_when(
+      rx_use == 1 ~ TRUE,
+      rx_use == 0 ~ FALSE,
+      is.na(rx_use) ~ NA
+    )
+  )
+```
+
 
 # Merging Main NHANES set and RX Supplement
 
@@ -1401,7 +1467,7 @@ combined_data <- combined_data |>
     # Exposure of Interest: Income
     income_ratio, income_cat,
     # Insurance
-    ins_dichot_original, ins_classif, ins_type, ins_any_gap,
+    ins_dichot_original, ins_dichot, ins_classif, ins_type, ins_any_gap,
     ins_private, ins_govt, ins_none, ins_rx,
     ins_govt_medicare, ins_govt_medigap, ins_govt_medicaid,
     ins_govt_chip, ins_govt_state, ins_govt_other,
