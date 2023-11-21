@@ -7,6 +7,8 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+require("knitr")
+opts_knit$set(root.dir = "/Users/michaelyan/Dropbox/Mac/Desktop/UTH/Fall 2023/Epi 3/Group Project/epi3_group2/data")
 ```
 
 ```{r, message=FALSE}

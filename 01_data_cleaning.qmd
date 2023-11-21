@@ -1564,7 +1564,7 @@ We saved our combined, cleaned data set into RDS format.
 
 ```{r}
 saveRDS(combined_data, here('data', 'combined_data.rds'))
-saveRDS(combined_data, here('data', 'subset_1168.rds'))
+saveRDS(subet_1168, here('data', 'subset_1168.rds'))
 ```
 
 ```{r}
