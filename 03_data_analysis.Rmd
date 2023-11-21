@@ -1,0 +1,24 @@
+---
+title: "Data Analysis Section"
+author: "Qiheng(Michael) Yan"
+date: "2023-11-21"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+library(tidyverse)
+library(stats)
+library(ggplot2)
+set.seed(1028)
+```
+
+# Epi 3 Data Analysis
+```{r}
+# Import the dataset
+setwd("/Users/michaelyan/Dropbox/Mac/Desktop/UTH/Fall 2023/Epi 3/Group Project/epi3_group2/data")
+data<-readRDS("combined_data.rds")
+```
