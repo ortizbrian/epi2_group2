@@ -1479,7 +1479,7 @@ unique(pull(
 # TRUE
 ```
 
-We also examined for subjects that were missing our exposure of interest (family income ratio). This resuletd in a further 323 excluded subjects.
+We also examined for subjects that were missing our exposure of interest (family income ratio). This resulted in a further 323 excluded subjects.
 
 ```{r}
 combined_data <- combined_data |>
@@ -1500,6 +1500,9 @@ attributes(combined_data[['drop_flag']])$label <- paste(
 nrow(combined_data |>
        filter(!drop_flag))
 # 1168
+
+subet_1168<-combined_data |>
+       filter(!drop_flag)
 ```
 
 # Reordering Variables
@@ -1561,6 +1564,7 @@ We saved our combined, cleaned data set into RDS format.
 
 ```{r}
 saveRDS(combined_data, here('data', 'combined_data.rds'))
+saveRDS(combined_data, here('data', 'subset_1168.rds'))
 ```
 
 ```{r}

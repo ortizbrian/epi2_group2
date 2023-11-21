@@ -19,6 +19,8 @@ set.seed(1028)
 # Epi 3 Data Analysis
 ```{r}
 # Import the dataset
-setwd("/Users/michaelyan/Dropbox/Mac/Desktop/UTH/Fall 2023/Epi 3/Group Project/epi3_group2/data")
-data<-readRDS("combined_data.rds")
+complete_data<-readRDS("combined_data.rds")
+subset_1168_data<-readRDS("subset_1168.rds")
 ```
+
+## 
