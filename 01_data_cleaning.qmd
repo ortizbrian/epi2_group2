@@ -1,0 +1,1571 @@
+---
+title: "Data Cleaning"
+date: "2022-11-06 <br> Updated: `r Sys.Date()`"
+format: pdf
+editor: 
+  markdown: 
+    wrap: sentence
+---
+
+# ⭐️Overview
+
+This file achieves pre-processing and cleaning of the NHANES data sets.
+
+## Main NHANES Data Set Modifications
+
+-   Values equivalent to an empty string, "refused", or "don't know" were converted into missing (`NA`) values
+
+-   Columns were labeled
+
+-   Columns were converted into factors with value labels, if categorical
+
+-   The two race columns were checked, and found to have different categories. These were further consolidated into an additional 2 columns, which combined "Mexican American" and "Other Hispanic" into "Hispanic".
+
+-   The two income-ratio columns were compared and found to be different, so the column with the clearest documentation in the NHANES codebooks was selected to keep
+
+-   Insurance categorization and Alcohol use categories were created
+
+-   Columns were renamed into descriptive names, and reordered
+
+## RX Data
+
+-   Drugs were binned into classifications to create flags
+
+-   Total count of lipid-lowering drugs for each subject was generated
+
+-   Data was consolidated into a single row per subject
+
+-   Columns were renamed into descriptive names
+
+## Combined Data
+
+-   Main NHANES data and RX supplement data were merged into a single data set
+
+-   Presence of a single row per subject was verified
+
+-   Columns were reordered
+
+-   Subjects with any exclusion (or lack of inclusion) criteria, or missing any value for the outcome variable were flagged for exclusion in `drop_flag`
+
+## 🕒 Change Log
+
+**2023-11-06**, file initialized. Data sets cleaned, filtered, and merged into a single data set for analysis.
+
+**2023-11-08**, revised drop criteria; added BMI calculation check. Revised calculated vars to have 'FALSE' appropriately.
+
+**2023-11-09**, revised race, ensured labels appropriately added to variables.
+
+# 📦 Load packages & Functions
+
+```{r, message=FALSE, warning=FALSE}
+library(here, warn.conflicts = FALSE)
+library(readxl, warn.conflicts = FALSE)
+library(openxlsx, warn.conflicts = FALSE)
+library(tidyverse, warn.conflicts = FALSE)
+```
+
+## 📥 Import the Data
+
+We imported the core NHANES data.
+
+```{r}
+nhanes_path <- here("data", "CSV", "nhanes_compliance.txt")
+
+nhanes_data <- read.delim(nhanes_path, row.names=NULL) 
+
+# Print a message for when this file is being sourced
+cat(
+  paste0(Sys.Date(), ":"),
+  "NHANES data imported with", nrow(nhanes_data), "rows and", 
+  ncol(nhanes_data), "columns. \n",
+  "Data last modified: ", as.character(file.info(nhanes_path)$mtime), "\n"
+)
+
+# 2023-11-06: NHANES data imported with 7122 rows and 86 columns.
+# Data last modified:  2023-10-07 13:17:21 
+```
+
+We imported the NHANES drug use data.
+
+```{r}
+rx_path <- here("data", "CSV", "drug_info.txt")
+
+rx_data <- read.delim(rx_path, row.names=NULL)   
+
+# Print a message for when this file is being sourced
+cat(
+  paste0(Sys.Date(), ":"),
+  "Medication Use data imported with", nrow(rx_data), "rows and", 
+  ncol(rx_data), "columns.\n",
+  "Data last modified: ", as.character(file.info(rx_path)$mtime), "\n"
+)
+
+# 2023-11-06: Medication Use data imported with 1977 rows and 14 columns.
+#  Data last modified:  2023-10-07 13:59:46 
+```
+
+We imported our data document provided by the teaching team, for labels.
+
+```{r}
+doc_path <- here("docs", "Data Overview and Summary.xlsx")
+
+nhanes_doc <- read_excel(doc_path, 
+                         # Select the sheet 
+                         sheet = "Main Dataset Variables", 
+                         # Skip unnecessary top rows
+                         # default sets the first kept row to header names
+                         skip = 1,
+                         # Set column types. "Skip" omits the column.
+                         # Want just 'Variable' and 'Label' columns.
+                         col_types = c(
+                           "skip", "text", rep("skip",3), "text", 
+                           rep("skip",2)
+                           )
+                         )
+
+rx_doc <- read_excel(doc_path,
+                     # Select the sheet
+                     sheet = "Drug info", 
+                     # Skip unnecessary top rows
+                     # default sets the first kept row to header names
+                     skip = 2,
+                     # Set column types. "Skip" omits the column.
+                     # Want just the 'Variable' and 'Label' columns
+                     col_types = c(
+                       "skip", "text", rep("skip",2), "text", 
+                       rep("skip",9)
+                       )
+                     )
+
+# Print a message for when this file is being sourced
+cat(
+  paste0(Sys.Date(), ":"),
+  "Main variable data imported with", nrow(nhanes_data), "rows and", 
+  ncol(nhanes_data), "columns.\n",
+  "Rx specific variable data imported with", nrow(rx_data), "rows and", 
+  ncol(rx_data), "columns.\n",
+  "Data last modified: ", as.character(file.info(doc_path)$mtime), "\n"
+)
+
+# 2023-11-06: Main variable data imported with 7122 rows and 86 columns.
+#  Rx specific variable data imported with 1977 rows and 14 columns.
+#  Data last modified:  2023-10-07 14:14:53 
+```
+
+We purged the paths from our environment for memory management
+
+```{r}
+rm(doc_path)
+rm(nhanes_path)
+rm(rx_path)
+```
+
+# Assessment of Original Data
+
+The original core NHANES data took the form of 7,122 rows with 86 columns.
+
+```{r}
+dim(nhanes_data)
+# [1] 7122   86
+```
+
+This consisted of 7 character columns, 8 double numeric columns, and 71 integer columns.
+
+```{r}
+nhanes_data |>
+  summarize(across(everything(), pillar::type_sum)) |> 
+    pivot_longer(
+      everything(), 
+      names_to = "col_names", 
+      values_to = "col_type") |>
+  count(col_type)
+```
+
+The original Prescription NHANES data took the form of 1,977 rows with 14 columns.
+
+```{r}
+dim(rx_data)
+# [1] 1,977   14
+```
+
+This consisted of 8 character columns and 6 integer columns.
+
+```{r}
+rx_data |>
+  summarize(across(everything(), pillar::type_sum)) |> 
+    pivot_longer(
+      everything(), 
+      names_to = "col_names", 
+      values_to = "col_type") |>
+  count(col_type)
+```
+
+# Main NHANES Data Set
+
+## Data Cleaning
+
+### Eliminating Uninformative Values
+
+Values of "Don't know", "Missing", or "Refused" were not informative for our analyses.
+To simplify our data set, these values were converted to missing (`NA`) values.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  # for all identified variables, if value is 7 or 9, convert to missing
+  mutate(across(all_of(c(
+                'DMDEDUC2', 'HIQ011', 'HIQ270', 'HIQ210', 'MCQ220', 'MCQ160B',
+                'MCQ366A', 'MCQ366B', 'MCQ366D', 
+                'MCQ371A', 'MCQ371B', 'MCQ371C', 'MCQ371D',
+                'WHQ030', 'WHQ040', 
+                'INDFMMPC', 'OCD150'
+                )
+          ), 
+        ~ifelse(
+           ((. == 7)|(. == 9)), 
+           NA, 
+           .)
+         )
+  ) |>
+  # for all identified variables, if value is 77 or 99, convert to missing
+  mutate(across(all_of(c(
+                'DMDMARTZ', 'DMDYRUSZ', 'DMDBORN4', 'ALQ121', 'HIQ032A'
+                )
+            ),
+         ~ifelse(
+           ((. == 77)|(. == 99)), 
+           NA, 
+           .)
+        )
+  )|>
+  # for all identified variables, if value is 777 or 999, convert to missing
+  mutate(across(all_of(c(
+                'ALQ130'
+                )
+            ),
+         ~ifelse(
+           ((.x == 777)|(.x == 999)), 
+           NA, 
+           .x)
+         )
+  )|>
+  # for all identified variables, if value is 77777 or 99999, convert 
+  # to missing values
+  mutate(across(all_of(c(
+                'MCD180B', 'MCD180C', 'MCD180D', 'MCD180E', 'MCD180F'
+                )
+            ),
+         ~ifelse(
+           ((.x == 77777)|(.x == 99999)), 
+           NA, 
+           .x)
+         )
+  ) |>
+  # Convert any empty ("") strings, or values of "refusal" or "missing", to
+  # missing values
+  mutate(across(
+    where(is.character), 
+      ~ifelse(
+          ((.x == "") | (.x == "refusal") | (.x == "missing")),
+          NA,
+          .x
+        )
+      )
+    )
+```
+
+### Applying Value Labels
+
+#### Character to Categorical
+
+We identified which of our variables were potentially categorical data represented by character values, which would require conversion into appropriately labeled and ordered factors.
+This identified 7 columns.
+
+```{r}
+# Initiate empty tibble
+poss_vars <- tibble::tibble(
+    !!!c("var", "values"), .rows = 0, 
+    .name_repair = ~c("var", "values")
+  )
+
+# For each column, if it is a character, extract the name of the column and
+# the unique variables of that column into a tibble for manual review.
+
+for (col_name in colnames(nhanes_data)){
+  if (is.character(nhanes_data[[col_name]])){
+    poss_vars <- bind_rows(
+      poss_vars,
+     tibble::tibble(
+       'var' = col_name,
+       'values' = paste(unique(nhanes_data[[col_name]]), 
+                        collapse = ", ")
+       )
+     )
+  }
+}
+
+nrow(poss_vars)
+```
+
+We cross-referenced these values with the [NHANES documentation](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020) to identify which variables should be converted to categorical, and their appropriate value labels.
+
+There were 4 columns identified that had similar value labels.
+These columns were batch-converted to boolean/logical.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  # Convert each column into a boolean/logical based on value
+  mutate(across(
+      c(
+        'BPQ080', 'BPQ060', 'BPQ090D', 'BPQ100D'
+      ),
+      ~case_when(
+        .x == 'yes' ~ TRUE,
+        .x == 'no' ~ FALSE,
+        .x == 'refusal' ~ NA,
+        .x == 'missing' ~ NA,
+        .x == '' ~ NA,
+        TRUE ~ NA
+      )
+    )
+  )
+```
+
+The column `BPQ070` had more complex values, and was manually converted to an ordered factor.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  # Convert column into a numeric based on value
+  mutate(
+    BPQ070 = case_when(
+      BPQ070 == 'yes' ~ 1,
+      BPQ070 == 'no' ~ 2,
+      BPQ070 == '3' ~ 3,
+      BPQ070 == '4' ~ 4,
+      BPQ070 == 'missing' ~ NA,
+      BPQ070 == '' ~ NA,
+      TRUE ~ NA
+    )
+  ) |>
+  mutate(
+  # Convert to ordered factor
+    BPQ070 = factor(
+      BPQ070,
+      levels = c(1, 2, 3, 4),
+      labels = c(
+        'Within 1 year',
+        '1-2 years ago',
+        '2-5 years ago',
+        '5+ years ago'
+        ),
+      ordered = TRUE
+      )
+    ) 
+```
+
+The column \`race\`\` had more complex values, and was manually converted to an ordered factor.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  # Convert column into a numeric based on value
+  mutate(
+    race = case_when(
+      race == 'Mexican American' ~ 1,
+      race == 'Other Hispanic' ~ 2,
+      race == 'Non-Hispanic White' ~ 3,
+      race == 'Non-Hispanic Black' ~ 4,
+      race == 'other Race including multi-racial' ~ 7
+    )
+  ) |>
+  # Convert to ordered factor
+  mutate(
+    race = factor(
+      race,
+      levels = c(1, 2, 3, 4, 7),
+      labels = c(
+        'Mexican American',
+        'Other Hispanic',
+        'Non-Hispanic White',
+        'Non-Hispanic Black',
+        'Other Race (including multiracial)'
+      ),
+      ordered = TRUE
+    )
+  )
+```
+
+The column `bmigp` had more complex values, and was manually converted to an ordered factor.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  # Convert column into a numeric based on value
+  mutate(
+    bmigp = case_when(
+      bmigp == 'underweight' ~ 1,
+      bmigp == 'normal weight' ~ 2,
+      bmigp == 'overweight' ~ 3,
+      bmigp == 'class 1 and 2 obesity' ~ 4,
+      bmigp == 'class 3 obesity' ~ 5,
+      bmigp == '' ~ NA,
+      TRUE ~ NA
+    )
+  ) |>
+  # Convert to ordered factor
+  mutate(
+    bmigp = factor(
+      bmigp,
+      levels = c(1, 2, 3, 4, 5),
+      labels = c(
+        'Underweight',
+        'Normal Weight',
+        'Overweight',
+        'Obese Class 1 or 2',
+        'Obese Class 3'
+        ),
+      ordered = TRUE
+    )
+  )
+```
+
+#### Numeric to Categorical
+
+We identified which of our variables were potentially categorical data represented by numeric values, which would require conversion into appropriately labeled and ordered factors.
+This identified 78 columns.
+
+```{r}
+# Initiate empty tibble
+poss_vars <- tibble::tibble(
+    !!!c("var", "values"), .rows = 0, 
+    .name_repair = ~c("var", "values")
+  )
+
+# For each column, if it is numeric, extract the name of the column and
+# the unique variables of that column into a tibble for manual review.
+# Omit the 'SEQN' subject ID variable.
+
+for (col_name in colnames(nhanes_data)[colnames(nhanes_data) != 'SEQN']){
+  if (is.numeric(nhanes_data[[col_name]])){
+    poss_vars <- bind_rows(
+      poss_vars,
+     tibble::tibble(
+       'var' = col_name,
+       'values' = paste(unique(nhanes_data[[col_name]]), 
+                        collapse = ", ")
+       )
+     )
+  }
+}
+
+nrow(poss_vars)
+```
+
+We cross-referenced these values with the [NHANES documentation](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020) to identify which variables should be converted to categorical, and their appropriate value labels.
+
+There were 35 columns identified that were appropriate to convert into logical booleans (TRUE/FALSE).
+These columns were batch-converted.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(
+    CVD_HX = case_when(
+      CVD_HX == 0 ~ FALSE,
+      CVD_HX == 1 ~ TRUE,
+      TRUE ~ NA
+    )
+  ) |>
+  # for each of the identified columns...
+  mutate(across(
+    c('ALQ111', 'WHQ070', 'HIQ011', 'HIQ270', 'HIQ210', 'MCQ220', 'HIQ032A'), 
+    # Set value based on the value in the column...
+    ~case_when(
+      .x == 1 ~ TRUE,
+      .x == 2 ~ FALSE,
+      TRUE ~ NA)
+    )
+  ) |>
+  mutate(across(
+    # For each of the identified columns...
+    c(
+      'HIQ032B', 'HIQ032C','HIQ032D', 'HIQ032E', 'HIQ032H',
+      'HIQ032I', 'HIQ032J',
+      'WHD080A', 'WHD080B', 'WHD080C', 'WHD080D', 'WHD080E', 
+      'WHD080F', 'WHD080G', 'WHD080H', 'WHD080I', 'WHD080J', 
+      'WHD080K', 'WHD080M', 'WHD080N', 'WHD080O', 'WHD080P', 
+      'WHD080Q', 'WHD080R', 'WHD080S', 'WHD080T', 'WHD080U',
+      'WHD080L'
+      ),
+    # Convert to TRUE if there is a value present
+    ~ifelse(!is.na(.x), TRUE, NA)
+    )
+  )
+```
+
+There were 13 identified columns with highly similar desired value labels.
+These labels applied with batch-processing.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(across(
+      c(
+        'MCQ160B', 'MCQ160C', 'MCQ160D', 'MCQ160E', 'MCQ160F',
+        'MCQ366A', 'MCQ366B', 'MCQ366C', 'MCQ366D', 
+        'MCQ371A', 'MCQ371B', 'MCQ371C', 'MCQ371D'
+        ),
+      ~case_when(
+        .x == 1 ~ TRUE,
+        .x == 2 ~ FALSE,
+        .x == 7 ~ NA,
+        .x == 9 ~ NA,
+        TRUE ~ NA
+      )
+    )
+  )
+
+```
+
+There were 14 columns with significant differences in variable value labels.
+These columns were converted with individual modifications.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(
+    SDDSRVYR = factor(
+      SDDSRVYR, 
+      levels = c(66),
+      labels = c('NHANES 2017-2020 public release')
+      ),
+    RIDRETH3 = factor(
+      RIDRETH3,
+      levels = c(1, 2, 3, 4, 6, 7),
+      labels = c(
+        'Mexican American',
+        'Other Hispanic',
+        'Non-Hispanic White',
+        'Non-Hispanic Black',
+        'Non-Hispanic Asian',
+        'Other Race (including multiracial)'
+      ),
+      ordered = TRUE
+    ),
+    DMDBORN4 = factor(
+      DMDBORN4,
+      levels = c(1, 2),
+      labels = c(
+        'Born in the 50 US states or Washington, DC',
+        'Others'
+      ),
+      ordered = TRUE
+    ),
+    DMDYRUSZ = factor(
+      DMDYRUSZ,
+      levels = c(1, 2, 3, 4),
+      labels = c(
+        'Less than 5 years',
+        '5+ but < 15 years',
+        '15 but < 30 years',
+        '30+ years'
+      ),
+      ordered = TRUE
+    ),
+    DMDEDUC2 = factor(
+      DMDEDUC2,
+      levels = c(1, 2, 3, 4, 5),
+      labels = c(
+        'Less than 9th grade',
+        '9th-11th grade',
+        'HS graduate or GED',
+        'Some college or AA degree',
+        'College graduate or above'
+      ),
+      ordered = TRUE
+    ),
+    DMDMARTZ = factor(
+      DMDMARTZ,
+      levels = c(1, 2, 3),
+      labels = c(
+        'Married/Living with Partner',
+        'Widowed/Divorced/Separated',
+        'Never Married'
+      ),
+      ordered = TRUE
+    ),
+    SIALANG = factor(
+      SIALANG,
+      levels = c(1, 2),
+      labels = c(
+        'English', 'Spanish'
+      ),
+      ordered = TRUE
+    ),
+    ALQ121 = factor(
+      ALQ121,
+      levels = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      labels = c(
+        'Never in last year',
+        'Every day',
+        'Nearly every day',
+        '3-4 times per week',
+        'twice per week',
+        'once per week',
+        '2-3 times per month',
+        'once per month',
+        '7-11 times in the last year',
+        '3-6 times in the last year',
+        '1-2 times in the last year'
+      ),
+      ordered = TRUE
+    ),
+  WHQ030 = factor(
+    WHQ030,
+    levels = c(1, 2, 3),
+    labels = c(
+      'Overweight',
+      'Underweight',
+      'About the right weight'
+      ),
+    ordered = TRUE
+    ),
+  WHQ040 = factor(
+    WHQ040,
+    levels = c(1, 2, 3),
+    labels = c(
+      'More',
+      'Less',
+      'About the same'
+      ),
+    ordered = TRUE
+    ),
+  INDFMMPC = factor(
+    INDFMMPC,
+    levels = c(1, 2, 3),
+    labels = c(
+      'Less than or equal to 135% of FPL',
+      'Between 135 and 185% of FPL',
+      'Greater than 185% FPL'
+      ),
+    ordered = TRUE
+    ),
+  OCD150 = factor(
+    OCD150,
+    levels = c(1, 2, 3, 4),
+    labels = c(
+      'Employed and working',
+      'Employed, but not working',
+      'Seeking work',
+      'Unemployed'
+      ),
+    ordered = TRUE
+    ),
+  sex = factor(
+    sex,
+    levels = c(1, 2),
+    labels = c('Male', 'Female'),
+    ordered = TRUE
+    ),
+  SMOKING_HX = factor(
+    SMOKING_HX,
+    levels = c(0, 1, 2),
+    labels = c(
+      'Never',
+      'Past',
+      'Current'
+      ),
+    ordered = TRUE
+    )
+  )
+```
+
+The remaining 15 numeric columns were appropriately stored as numeric values.
+
+We purged the tibble of variables to check, as it was no longer needed.
+
+```{r}
+rm(poss_vars)
+rm(col_name)
+```
+
+### Checking Potential Duplicate Variables
+
+The two race variables held the same data, with a different number of categories. As such, they would be renamed to clarify this difference.
+
+```{r}
+nhanes_data |>
+  select(RIDRETH3, race)
+```
+
+There were two variables that appeared to contain the family income ratio. These were compared, and found to be significantly different. As such, we elected to keep the variable that was more strictly and clearly defined by NHANES (INDFMMPI).
+
+```{r}
+nhanes_data |>
+  select(INDFMMPI, INDFMPIR) |>
+  filter(INDFMMPI != INDFMPIR) |>
+  mutate(diff = ifelse(INDFMMPI > INDFMPIR, TRUE, FALSE))
+```
+
+```{r}
+nhanes_data <- nhanes_data |>
+  select(-INDFMPIR)
+```
+
+### Standardizing Variable Names
+
+The NHANES variables were not in a clear, descriptive format.
+
+```{r}
+colnames(nhanes_data)
+
+#  [1] "SEQN"                "SDDSRVYR"            "RIDRETH3"           
+#  [4] "DMDBORN4"            "DMDYRUSZ"            "DMDEDUC2"           
+#  [7] "DMDMARTZ"            "SIALANG"             "ALQ111"             
+# [10] "ALQ121"              "ALQ130"              "HIQ011"             
+# [13] "HIQ032A"             "HIQ032B"             "HIQ032C"            
+# [16] "HIQ032D"             "HIQ032E"             "HIQ032H"            
+# [19] "HIQ032I"             "HIQ032J"             "HIQ270"             
+# [22] "HIQ210"              "MCQ160B"             "MCD180B"            
+# [25] "MCQ160C"             "MCD180C"             "MCQ160D"            
+# [28] "MCD180D"             "MCQ160E"             "MCD180E"            
+# [31] "MCQ160F"             "MCD180F"             "MCQ220"             
+# [34] "MCQ366A"             "MCQ366B"             "MCQ366C"            
+# [37] "MCQ366D"             "MCQ371A"             "MCQ371B"            
+# [40] "MCQ371C"             "MCQ371D"             "WHQ030"             
+# [43] "WHQ040"              "WHQ070"              "WHD080A"            
+# [46] "WHD080B"             "WHD080C"             "WHD080D"            
+# [49] "WHD080E"             "WHD080F"             "WHD080G"            
+# [52] "WHD080H"             "WHD080I"             "WHD080J"            
+# [55] "WHD080K"             "WHD080M"             "WHD080N"            
+# [58] "WHD080O"             "WHD080P"             "WHD080Q"            
+# [61] "WHD080R"             "WHD080S"             "WHD080T"            
+# [64] "WHD080U"             "WHD080L"             "INDFMMPI"           
+# [67] "INDFMMPC"            "BPQ080"              "BPQ060"             
+# [70] "BPQ070"              "BPQ090D"             "BPQ100D"            
+# [73] "OCD150"              "age"                 "sex"                
+# [76] "bcbmi"               "race"                "bmigp"              
+# [79] "mod_work_min"        "trans_min"           "mod_rec_min"        
+# [82] "total_phys_activity" "vigactivity"         "SMOKING_HX"         
+# [85] "CVD_HX"                  
+```
+
+### Applying Variable Labels
+
+Variable Labels in R allow quick referencing between a column and its documentation.
+We applied these label attributes based on the labels stored in the data source documents
+
+```{r}
+# Iterate through each column in `nhanes_data`, and pull the corresponding 
+# label from the documentation (`nhanes_doc`) as its value
+for (col_name in colnames(nhanes_data)){
+  attributes(nhanes_data[[col_name]])$label <- pull(
+    nhanes_doc |>
+      filter(Variable == col_name) |>
+      select(Label)
+    )
+}
+
+# Iterate through each column in `rx_data`, and pull the corresponding 
+# label from the documentation (`rx_doc`) as its value
+for (col_name in colnames(rx_data)){
+  attributes(rx_data[[col_name]])$label <- pull(
+    rx_doc |>
+      filter(Variable == col_name) |>
+      select(Label)
+    )
+}
+
+# Purge iterative variable that is no longer necessary
+rm(col_name)
+```
+
+We renamed all variables in the NHANES data set, according to our style guide.
+
+```{r}
+renaming_vars <- tibble::tribble(
+      ~original_var,          ~new_var,
+      'seqn',                 'id',
+      'sddsrvyr',             'collection_cycle',
+      'ridreth3',             'race_6cat',
+      'dmdborn4',             'accult_birth_country', 
+    	'dmdyrusz',             'accult_time_usa',
+    	'dmdeduc2',             'educ_level',
+    	'dmdmartz',             'marital_status',
+    	'sialang',              'collection_lang',
+    	'alq111',               'alc_ever', 
+    	'alq121',               'alc_freq',
+    	'alq130',               'alc_per_day',
+    	'hiq011',               'ins_dichot_original', 
+    	'hiq032a',              'ins_private', 
+    	'hiq032b',              'ins_govt_medicare',
+    	'hiq032c',              'ins_govt_medigap',
+    	'hiq032d',              'ins_govt_medicaid',
+    	'hiq032e',              'ins_govt_chip',
+    	'hiq032h',              'ins_govt_state',
+    	'hiq032i',              'ins_govt_other',
+    	'hiq032j',              'ins_none',
+    	'hiq270',               'ins_rx',
+    	'hiq210',               'ins_any_gap',
+    	'mcq160b',              'cvd_chf_ever',
+    	'mcd180b',              'cvd_chf_age', 
+    	'mcq160c',              'cvd_cad_ever',
+    	'mcd180c',              'cvd_cad_age', 
+    	'mcq160d',              'cvd_angina_ever',
+    	'mcd180d',              'cvd_angina_age',
+    	'mcq160e',              'cvd_mi_ever',
+    	'mcd180e',              'cvd_mi_age',
+    	'mcq160f',              'cvd_cva_ever',
+    	'mcd180f',              'cvd_cva_age',
+    	'mcq220',               'cancer_ever',
+    	'mcq366a',              'weight_need_ever',
+    	'mcq366b',              'weight_need_exercise',
+    	'mcq366c',              'weight_need_salt',
+    	'mcq366d',              'weight_need_fat',
+    	'mcq371a',              'weight_act_now',
+    	'mcq371b',              'weight_act_now_exercise',
+    	'mcq371c',              'weight_act_now_salt',
+    	'mcq371d',              'weight_act_now_fat',
+    	'whq030',               'weight_self',
+    	'whq040',               'weight_self_wish',
+    	'whq070',               'weight_act_year',
+    	'whd080a',              'weight_act_year_cut',
+    	'whd080b',              'weight_act_year_calories',
+    	'whd080c',              'weight_act_year_fat',
+    	'whd080d',              'weight_act_year_exercise',
+    	'whd080e',              'weight_act_year_skip',
+    	'whd080f',              'weight_act_year_product',
+    	'whd080g',              'weight_act_year_liquid',
+    	'whd080h',              'weight_act_year_program',
+    	'whd080i',              'weight_act_year_rx',
+    	'whd080j',              'weight_act_year_nonrx',
+    	'whd080k',              'weight_act_year_purge',
+    	'whd080m',              'weight_act_year_water',
+    	'whd080n',              'weight_act_year_diet',
+    	'whd080o',              'weight_act_year_carbs',
+    	'whd080p',              'weight_act_year_smoke',
+    	'whd080q',              'weight_act_year_veg',
+    	'whd080r',              'weight_act_year_habits',
+    	'whd080s',              'weight_act_year_sweets',
+    	'whd080t',              'weight_act_year_junk',
+    	'whd080u',              'weight_act_year_surgery',
+    	'whd080l',              'weight_act_year_other',
+    	'indfmmpi',             'income_ratio',
+    	'indfmmpc',             'income_cat_original',
+    	'bpq080',               'cholesterol_ever',
+    	'bpq060',               'cholesterol_check_ever',
+    	'bpq070',               'cholesterol_check_last',
+    	'bpq090d',              'cholesterol_rx_ever',
+    	'bpq100d',              'adherence',
+    	'ocd150',               'occupation_type_week',
+    	'age',                  'age',
+    	'sex',                  'sex',
+    	'bcbmi',                'bmi',
+    	'race',                 'race_5cat',
+    	'bmigp',                'bmi_cat',
+    	'mod_work_min',         'active_mod_work_dur',
+    	'trans_min',            'active_transport_dur',
+    	'mod_rec_min',          'active_mod_rec_dur',
+    	'total_phys_activity',  'active_total',
+    	'vigactivity',          'active_vig_dur',
+    	'smoking_hx',           'smoking_hx',
+    	'cvd_hx',                'cvd_hx'
+    )
+```
+
+We applied these new names.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  dplyr::rename_at(colnames(nhanes_data), ~tolower(colnames(nhanes_data))) |>
+  dplyr::rename_at(renaming_vars$original_var, ~renaming_vars$new_var)
+```
+
+We purged our documentation data sets and the renaming set, as they were no longer necessary.
+
+```{r}
+rm(renaming_vars)
+rm(rx_doc)
+rm(nhanes_doc)
+```
+
+## Calculating Variables
+
+### Race
+
+We consolidated "Mexican American" and "Other Hispanic" into a single category, from both categorizations of our race variables.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(
+    race_ethn_4cat = case_when(
+      race_5cat %in% c('Mexican American', 'Other Hispanic') ~ "Hispanic",
+      !(race_5cat %in% c('Mexican American', 'Other Hispanic')) ~ race_5cat,
+      is.na(race_5cat) ~ NA
+    ),
+    race_ethn_5cat = case_when(
+      race_6cat %in% c('Mexican American', 'Other Hispanic') ~ "Hispanic",
+      !(race_6cat %in% c('Mexican American', 'Other Hispanic')) ~ race_5cat,
+      is.na(race_6cat) ~ NA
+    )
+  ) |>
+  mutate(
+    race_ethn_4cat = factor(
+      race_ethn_4cat,
+      levels = c(
+        'Hispanic',
+        'Non-Hispanic White',
+        'Non-Hispanic Black',
+        'Other Race (including multiracial)'
+      ),
+      ordered = TRUE
+    ),
+    race_ethn_5cat = factor(
+      race_ethn_5cat,
+      levels = c(
+        'Hispanic',
+        'Non-Hispanic White',
+        'Non-Hispanic Black',
+        'Non-Hispanic Asian',
+        'Other Race (including multiracial)'
+      ),
+      ordered = TRUE
+    )
+  )
+
+attributes(nhanes_data[['race_ethn_4cat']])$label <- paste0(
+  "Race/Hispanic origin without Non-Hispanic Asian"
+  )
+  
+attributes(nhanes_data[['race_ethn_5cat']])$label <- paste0(
+  "Race/Hispanic origin with Non-Hispanic Asian"
+  )
+```
+
+### Health Insurance
+
+We created a single boolean/logical column which would indicate if there was an endorsement of *any* form of government insurance.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  # If any government insurance, `ins_govt` = TRUE
+  mutate(
+    ins_govt = ifelse( 
+      (ins_govt_medicare | ins_govt_medigap | ins_govt_medicaid |
+         ins_govt_chip | ins_govt_state | ins_govt_other), TRUE, FALSE
+      )
+    )
+
+attributes(nhanes_data[['ins_govt']])$label <- 
+  'Covered by government insurance'
+```
+
+We examined rows with more than one insurance listed. Unfortunately, since [Medicare may be primary or secondary](https://www.medicare.gov/supplements-other-insurance/how-medicare-works-with-other-insurance), we cannot classify Medicare as the dominant insurance where it co-occurs with private insurance. [Medicaid is typically](https://www.macpac.gov/subtopic/how-medicaid-interacts-with-other-payers/), but not always, a 'payer of last resort' (secondary). As such, there's no real way to consolidate individuals with both private and government insurance into a single category.
+
+```{r}
+nhanes_data |>
+  rowwise() |>
+  mutate(n_ins = sum(ins_govt, ins_private, ins_none, na.rm = TRUE)) |>
+  filter(n_ins > 1) |>
+  select(
+    id, n_ins, ins_govt, ins_private, ins_none, ins_govt_medicaid, 
+    ins_govt_medicare, ins_govt_medigap, ins_govt_chip, ins_govt_state, 
+    ins_govt_other
+    )
+```
+
+We created a categorical variable for insurance type as an ordered factor.
+
+```{r}
+ nhanes_data <- nhanes_data |>
+  # Categorize based on insurance type
+  mutate(
+    ins_type = case_when(
+      ins_govt & ins_private ~ 'Both private and government',
+      ins_govt ~ 'Government',
+      ins_private ~ 'Private',
+      ins_none ~ 'Uninsured',
+      TRUE ~ NA
+    )
+  ) |>
+  mutate(
+    ins_type = factor(
+      ins_type,
+      levels = c(
+        'Uninsured', 'Government', 'Private', 'Both private and government'
+        ),
+      ordered = TRUE
+    )
+  )
+
+attributes(nhanes_data[['ins_type']])$label <- 'Health Insurance Type'
+```
+
+We then made a further categorical indicating the totality of a participant's health insurance coverage (type and drug coverage inclusion).
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(
+    ins_classif = case_when(
+      (ins_type == 'Both private and government' & 
+         ins_rx) ~ "Both private and government, with drug coverage",
+      (ins_type == 'Both private and government' & 
+         !ins_rx) ~ "Both private and government, without drug coverage",
+      (ins_type == 'Both private and government' & 
+         is.na(ins_rx)) ~ "Both private and government, unk drug coverage",
+      (ins_type == 'Government' & 
+         ins_rx) ~ "Government, with drug coverage",
+      (ins_type == 'Government' & 
+         !ins_rx) ~ "Government, without drug coverage",
+      (ins_type == 'Government' & 
+         is.na(ins_rx)) ~ "Government, unk drug coverage",
+      (ins_type == 'Private' & 
+         ins_rx) ~ "Private, with drug coverage",
+      (ins_type == 'Private' & 
+         !ins_rx) ~ "Private, without drug coverage",
+      (ins_type == 'Private' & 
+         is.na(ins_rx)) ~ "Private, unk drug coverage",
+      ins_type == 'Uninsured' ~ 'Uninsured',
+      TRUE ~ NA
+    )
+  ) |>
+  mutate(
+    ins_classif = factor(
+      ins_classif,
+      levels = c(
+        "Both private and government, with drug coverage",
+        "Both private and government, without drug coverage",
+        "Both private and government, unk drug coverage",
+        "Government, with drug coverage",
+        "Government, without drug coverage",
+        "Government, unk drug coverage",
+        "Private, with drug coverage",
+        "Private, without drug coverage",
+        "Private, unk drug coverage"
+        ),
+      ordered = TRUE
+    )
+  )
+
+attributes(nhanes_data[['ins_classif']])$label <- 'Total Insurance Status'
+```
+
+We then cleaned the remaining variables for the different insurance types, so that if a subject had a form of insurance, they would indicate FALSE rather than a missing value.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(
+    ins_govt = ifelse(is.na(ins_govt) & !is.na(ins_type), FALSE, ins_govt),
+    ins_private = ifelse(is.na(ins_private) & !is.na(ins_type), 
+                         FALSE, 
+                         ins_private
+                         ),
+    ins_none = ifelse(is.na(ins_none) & ins_type == 'Uninsured', TRUE, ins_none)
+  ) |>
+  mutate(ins_dichot = case_when(
+    ins_type == 'Uninsured' ~ FALSE,
+    !is.na(ins_type) & (ins_type != 'Uninsured') ~ TRUE,
+    is.na(ins_type) ~ NA
+    )
+  )
+
+attributes(nhanes_data[['ins_dichot']])$label <- 'Any insurance'
+```
+
+### Alcohol Use
+
+We calculated if a subject was a heavy drinker, based on [NIAAA standards](https://www.niaaa.nih.gov/alcohol-health/overview-alcohol-consumption/moderate-binge-drinking).
+
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(alc_heavy = NA) |>
+  # Calculate per-week intakes
+  mutate(
+    alc_per_week = case_when(
+      alc_freq == 'every day' ~ alc_per_day*7,
+      alc_freq == 'Nearly every day' ~ alc_per_day * 6,
+      alc_freq == '3-4 times per week' ~ alc_per_day * 4,
+      alc_freq == 'twice per week' ~ alc_per_day * 2,
+      alc_freq == 'once per week' ~ alc_per_day,
+      !is.na(alc_freq) ~ alc_per_day,
+      TRUE ~ NA
+    )
+  ) |>
+  # Classification by Gender
+  mutate(
+    alc_heavy = case_when(
+      sex == "Female" & (alc_per_week >=8 | alc_per_day >=4) ~ TRUE,
+      sex == "Female" & !(alc_per_week >=8 | alc_per_day >=4) ~ FALSE,
+      sex == "Male" & (alc_per_week >=15 |alc_per_day >= 5)~ TRUE,
+      sex == "Male" & !(alc_per_week >=15 |alc_per_day >= 5)~ FALSE,
+      TRUE ~ alc_heavy
+    )
+  ) |>
+  # If alc_freq was 'Never in last year', answer as FALSE
+  mutate(
+    alc_heavy = ifelse(
+      is.na(alc_heavy) & alc_freq == "Never in last year",
+      FALSE,
+      alc_heavy
+      )
+  ) |>
+  # If alc_ever is false, should also be false
+  mutate(
+    alc_heavy = ifelse(is.na(alc_heavy) & !alc_ever, FALSE, alc_heavy)
+  ) |>
+  # drop the per-week value, since it's vulnerable to missingness
+  select(-alc_per_week)
+
+attributes(nhanes_data[['alc_heavy']])$label <- 'Heavy Drinking Status'
+```
+
+### Income Ratio Category
+
+There was already a variable in our data set, `income_cat_original`, which documentation indicated was calculated from `INDFMMPI` (now `income_ratio`). In checking this column against a new calculated version, we determined this was accurate. 
+
+```{r}
+nrow(nhanes_data |>
+  mutate(income_cat = case_when(
+    !is.na(income_ratio) ~ NA,
+    income_ratio <= 1.35 ~ 'Less than or equal to 135% of FPL',
+    income_ratio <= 1.85 ~ 'Between 135 and 185% of FPL',
+    income_ratio > 1.85 ~ 'Greater than 185% of FPL'
+  )) |>
+  select(income_cat, income_cat_original, income_ratio) |>
+  filter(income_cat != income_cat_original)
+) == 0 
+# TRUE
+```
+
+As such, we renamed `income_cat_original` to `income_cat`.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  rename_at('income_cat_original', ~'income_cat')
+```
+
+## Verifying Teaching Team Variables
+
+### CVD_HX
+
+We verified the Teaching Team created variable `cvd_hx` by comparing to a newly calculated version. In comparison, we were able to identify that the original `cvd_hx` variable did not appropriately account for "Yes" answers to Myocardial infarction (MI).
+
+```{r}
+nhanes_data |>
+  mutate(cvd_val = case_when(
+    cvd_chf_ever ~ TRUE,
+    cvd_cad_ever ~ TRUE,
+    cvd_angina_ever ~ TRUE,
+    cvd_mi_ever ~ TRUE,
+    cvd_cva_ever ~ TRUE,
+    # If only values present are 'FALSE', it should be False! 
+    sum(
+      cvd_chf_ever, cvd_cad_ever, cvd_angina_ever, cvd_mi_ever, 
+      cvd_cva_ever, na.rm = TRUE
+      ) == 0 ~ FALSE,
+    TRUE ~ NA
+  )) |>
+  filter(cvd_val != cvd_hx) |>
+  select(
+    id, cvd_val, cvd_hx, cvd_chf_ever, cvd_cad_ever, 
+    cvd_angina_ever, cvd_mi_ever, cvd_cva_ever)
+
+```
+
+We overrode the original teaching team variable with our recalculated value.
+
+```{r}
+nhanes_data <- nhanes_data |>
+  mutate(cvd_hx = case_when(
+    cvd_chf_ever ~ TRUE,
+    cvd_cad_ever ~ TRUE,
+    cvd_angina_ever ~ TRUE,
+    cvd_mi_ever ~ TRUE,
+    cvd_cva_ever ~ TRUE,
+    # If only values present are 'FALSE', it should be False! 
+    sum(
+      cvd_chf_ever, cvd_cad_ever, cvd_angina_ever, cvd_mi_ever, 
+      cvd_cva_ever, na.rm = TRUE
+      ) == 0 ~ FALSE,
+    TRUE ~ NA
+  ))
+```
+
+### BMI Classification
+
+We verified the teaching team related variable classifying subject BMI values based on [CDC Classifications](https://www.cdc.gov/obesity/basics/adult-defining.html) was appropriate. 
+
+```{r}
+nrow(nhanes_data |>
+  select(bmi_cat, bmi) |>
+  mutate(bmi_cat_new = case_when(
+    is.na(bmi) ~ NA,
+    bmi < 18.5 ~ 'Underweight',
+    bmi >=18.5 & bmi <25 ~ 'Normal Weight',
+    bmi >=25 & bmi < 30 ~ 'Overweight',
+    bmi >=30 & bmi < 40 ~ 'Obese Class 1 or 2',
+    bmi >=40 ~ 'Obese Class 3'
+  )) |>
+  filter(bmi_cat != bmi_cat_new)
+) == 0
+```
+
+
+## Checking for Duplicates
+
+We verified that all rows in the data set represented a unique ID, without duplicates.
+
+```{r}
+length(unique(nhanes_data$id)) == nrow(nhanes_data)
+# TRUE
+```
+
+# RX Supplement Set
+
+The values of `RXDDRUG`, which contained names of medications, provided a promising method of classifying medications of interest from our data set.
+
+As such, we divided medications into Statins, PCKS9 inhibitors, Fibrates, Bile Acid Sequestrants, Supplements, Other Lipid-Lowering Medication, Non-Lipid-Lowering Medications, and Glucose Lowering Medications.
+
+```{r}
+rx_data <- rx_data |>
+  # Initialize columns
+  mutate(
+    rx_statin = NA,
+    rx_pcks9 = NA,
+    rx_fibrate = NA,
+    rx_sequestrant = NA,
+    rx_supplement = NA,
+    rx_non_lipid = NA,
+    rx_glucose_lowering = NA,
+    rx_other = NA,
+  ) |>
+  # Classify Drugs
+  mutate(
+    rx_statin = ifelse(
+      RXDDRUG %in% c(
+        'SIMVASTATIN', 'ATORVASTATIN', 'PRAVASTATIN', 'ROSUVASTATIN',
+        'PITAVASTATIN', 'EZETIMIBE; SIMVASTATIN', 'LOVASTATIN',
+        'COLESEVELAM', 'FLUVASTATIN'
+        ),
+      TRUE,
+      rx_statin
+      ),
+    rx_pcks9 = ifelse(
+      RXDDRUG %in% c('ALIROCUMAB','EVOLOCUMAB'), 
+      TRUE, 
+      rx_pcks9
+      ),
+    rx_fibrate = ifelse(
+      RXDDRUG %in% c('GEMFIBROZIL', 'FENOFIBRATE', 'FENOFIBRIC ACID'),
+      TRUE,
+      rx_fibrate
+      ),
+    rx_sequestrant = ifelse(
+      RXDDRUG %in% c('COLESTIPOL', 'CHOLESTYRAMINE'),
+      TRUE,
+      rx_sequestrant
+      ),
+    rx_supplement = ifelse(
+      RXDDRUG %in% c(
+        "OMEGA-3 POLYUNSATURATED FATTY ACIDS", "ICOSAPENT", "NIACIN"
+        ),
+      TRUE,
+      rx_supplement
+     ),
+    rx_other = ifelse(
+      RXDDRUG %in% c(
+        "ANTIHYPERLIPIDEMIC AGENTS - UNSPECIFIED", 'EZETIMIBE', 
+        'EZETIMIBE; SIMVASTATIN'
+        ),
+      TRUE,
+      rx_other
+    ),
+    rx_non_lipid = ifelse(
+      RXDDRUG %in% c(
+        'LISINOPRIL', 'LOSARTAN', 'CLOPIDOGREL', 'DILTIAZEM', 'AMLODIPINE',
+        'CARVEDILOL', 'PREDNISONE', 'OMEPRAZOLE', 'LEVOTHYROXINE', 
+        'DICLOFENAC', 'HYDROCHLOROTHIAZIDE; LISINOPRIL', 'METOPROLOL',
+        'FUROSEMIDE'
+      ),
+      TRUE,
+      rx_non_lipid
+    ),
+    rx_glucose_lowering = ifelse(
+      RXDDRUG %in% c(
+        "METFORMIN", "METFORMIN; SITAGLIPTIN", "LINAGLIPTIN; METFORMIN",
+        "EMPAGLIFLOZIN"
+        ),
+      TRUE,
+      rx_glucose_lowering
+    )
+  ) |>
+  # Create a binary logical/boolean indicating if a drug is, or is not,
+  # lipid-lowering
+  mutate(
+    rx_lipid = ifelse(
+      (rx_statin | rx_pcks9 | rx_fibrate | rx_sequestrant | 
+         rx_supplement | rx_other),
+      TRUE,
+      FALSE
+    )
+  ) |>
+  group_by(SEQN) |>
+  # Get total count of lipid-lowering medication per subject
+  mutate(
+    rx_lipid_count = sum(rx_lipid, na.rm = TRUE)
+  ) |>
+  # Convert rx_lipid into a subject-consistent flag
+  mutate(
+    rx_lipid = ifelse(rx_lipid_count > 0, TRUE, FALSE)
+  ) |>
+  # Ensure values are consistent for each subject
+  fill(all_of(c(
+    'rx_statin', 'rx_pcks9', 'rx_fibrate', 'rx_sequestrant', 'rx_supplement',
+    'rx_other', 'rx_non_lipid', 'rx_glucose_lowering'
+    )), 
+    .direction = "downup"
+  ) |>
+  ungroup()
+
+
+attributes(rx_data[['rx_statin']])$label <- paste(
+  "Subject reported a statin class anti-hyperlipidemic"
+  )
+attributes(rx_data[['rx_pcks9']])$label <- paste(
+    "Subject reported a PCKS9 inhibitor class anti-hyperlipidemic"
+  )
+attributes(rx_data[['rx_fibrate']])$label <- paste(
+    "Subject reported a fibrate class anti-hyperlipidemic"
+  )
+attributes(rx_data[['rx_sequestrant']])$label <- paste(
+    "Subject reported a bile acid sequestrant class anti-hyperlipidemic"
+  )
+attributes(rx_data[['rx_supplement']])$label <- paste(
+    "Subject reported a dietary supplement used as an anti-hyperlipidemic"
+  )
+attributes(rx_data[['rx_non_lipid']])$label <- paste(
+    "Subject reported a non-lipid lowering medication"
+  )
+attributes(rx_data[['rx_glucose_lowering']])$label <- paste(
+    "Subject reported insulin or other glucose-lowering medication"
+  )
+attributes(rx_data[['rx_other']])$label <- paste(
+    "Subject reported an anti-hyperlipidemic medication not otherwise",
+    "classified"
+  )
+attributes(rx_data[['rx_lipid']])$label <- paste(
+    "Subject reported an anti-hyperlipidemic drug"
+  )
+attributes(rx_data[['rx_lipid_count']])$label <- paste(
+    "Total number of anti-hyperlipidemic drugs reported by the subject"
+  )
+```
+
+We ensured each of these categories was consistent for all rows for a given `SEQN` value. 
+
+```{r}
+length(unique(rx_data$SEQN)) == nrow(
+  rx_data |>
+    select(
+      SEQN, rx_lipid, rx_lipid_count, rx_statin, rx_pcks9, 
+      rx_fibrate, rx_sequestrant, rx_supplement,
+      rx_other, rx_non_lipid, rx_glucose_lowering
+      ) |>
+    distinct()
+  )
+```
+
+We isolated the columns that were subject-specific, and took only a single row for each subject. We then converted any missing values into 'FALSE'.
+
+```{r}
+rx_data <- rx_data |>
+  select(
+    SEQN, RXDUSE, rx_lipid, COUNT, rx_lipid_count, RXDCOUNT, rx_statin, 
+    rx_pcks9, rx_fibrate, rx_sequestrant, rx_supplement, rx_other, 
+    rx_non_lipid, rx_glucose_lowering
+    ) |>
+  distinct() |>
+  mutate(across(all_of(c(
+                'rx_lipid', 'rx_statin', 'rx_pcks9', 'rx_fibrate', 
+                'rx_sequestrant', 'rx_supplement', 'rx_other', 'rx_non_lipid', 
+                'rx_glucose_lowering'
+                )
+              ), 
+      ~replace_na(., FALSE)
+      )
+    )
+      
+```
+
+We compared the teaching-team calculated `COUNT` to our newly created `rx_lipid_count`. We found that several non-lipid-lowering medications were counted as lipid-lowering, because of subjects that were also taking non-lipid-lowering medications or a subject reported a medication was taken for cholesterol (when it was not a medication indicated for cholesterol).
+
+As such, we dropped the original teaching-team created `COUNT` in favor of our calculated variable. We renamed our variables.
+
+```{r}
+rx_data <- rx_data |>
+  select(-COUNT) |>
+  rename_at(
+    c('SEQN', 'RXDUSE', 'RXDCOUNT', 'rx_lipid_count'),
+    ~c('id', 'rx_use', 'rx_count_total', 'rx_count_lipid'))
+```
+
+We converted the binary `rx_use` into a logical/boolean.
+
+```{r}
+rx_data <- rx_data |>
+  mutate(
+    rx_use = case_when(
+      rx_use == 1 ~ TRUE,
+      rx_use == 0 ~ FALSE,
+      is.na(rx_use) ~ NA
+    )
+  )
+```
+
+
+# Merging Main NHANES set and RX Supplement
+
+We merged our data sets by `id`.
+
+```{r}
+combined_data <- left_join(nhanes_data, rx_data, by = 'id')
+```
+
+We verified that we still had only one row per subject.
+
+```{r}
+length(unique(combined_data$id)) == nrow(combined_data)
+# TRUE
+```
+
+## Checking Exclusion Criteria
+
+Our analyses excluded those under 20 years of age, those taking insulin or other lipid-lowering medications, or with a history of cancer. This resulted in the exclusion of 1 subject.
+
+```{r}
+combined_data <- combined_data |>
+  mutate(
+    drop_flag = FALSE
+  ) |>
+  mutate(
+    drop_flag = case_when(
+      !is.na(age) & age < 20 ~ TRUE,
+      !is.na(rx_glucose_lowering) & rx_glucose_lowering ~ TRUE,
+      !is.na(cancer_ever) & cancer_ever ~ TRUE,
+      TRUE ~ drop_flag
+    )
+  )
+
+nrow(combined_data |> 
+       filter(drop_flag))
+# 1
+```
+
+We also assessed for subjects that lacked a value for our outcome of interest (endorsed adherence or non-adherence to prescribed lipid-lowering medication). This resulted in the exclusion of an additional 5,630 subjects.
+
+```{r}
+combined_data <- combined_data |>
+  mutate(drop_flag = ifelse(is.na(adherence), TRUE, drop_flag))
+
+nrow(combined_data |>
+  filter(drop_flag)) - 1
+# 5630
+```
+
+These 1,491 remaining subjects all reported being told they needed to take a prescription medication to lower their cholesterol by a health care provider.
+
+```{r}
+unique(pull(
+  combined_data |>
+    filter(!drop_flag) |>
+    select(cholesterol_rx_ever)
+  )
+)
+# TRUE
+```
+
+We also examined for subjects that were missing our exposure of interest (family income ratio). This resuletd in a further 323 excluded subjects.
+
+```{r}
+combined_data <- combined_data |>
+  mutate(drop_flag = ifelse(is.na(income_ratio), TRUE, drop_flag))
+
+nrow(combined_data |>
+  filter(drop_flag)) - 5631
+```
+
+This has left 1,168 subjects for analysis. Due to this smaller size, the excluded rows have not been dropped, but the flag kept in the data set.
+
+```{r}
+attributes(combined_data[['drop_flag']])$label <- paste(
+  "Flag for exclusion: age < 20, cancer history, taking insulin or other",
+  "glucose lowering medications, or lack of exposure or outcome variable"
+)
+
+nrow(combined_data |>
+       filter(!drop_flag))
+# 1168
+```
+
+# Reordering Variables
+
+We reordered our combined variables into a more cohesive and logical order for human-legibility.
+
+```{r}
+combined_data <- combined_data |>
+  relocate(
+    id, drop_flag, collection_cycle, collection_lang,
+    # Inclusion/Exclusion, and Outcome
+    cholesterol_rx_ever, adherence, cancer_ever, rx_glucose_lowering,
+    cholesterol_ever, cholesterol_check_ever, cholesterol_check_last,
+    # Demographics, SES
+    age, sex, race_ethn_4cat, race_ethn_5cat, race_5cat, race_6cat, 
+    marital_status, educ_level, occupation_type_week,
+    accult_birth_country, accult_time_usa,
+    # Exposure of Interest: Income
+    income_ratio, income_cat,
+    # Insurance
+    ins_dichot_original, ins_dichot, ins_classif, ins_type, ins_any_gap,
+    ins_private, ins_govt, ins_none, ins_rx,
+    ins_govt_medicare, ins_govt_medigap, ins_govt_medicaid,
+    ins_govt_chip, ins_govt_state, ins_govt_other,
+    # Co-morbid CHD
+    cvd_hx, cvd_chf_ever, cvd_chf_age, cvd_cad_ever, cvd_cad_age, 
+    cvd_angina_ever, cvd_angina_age, cvd_mi_ever, cvd_mi_age, cvd_cva_ever, 
+    cvd_cva_age, 
+    # Alcohol
+    alc_ever, alc_freq, alc_per_day, alc_heavy,
+    # Tobacco
+    smoking_hx,
+    # Activity
+    active_mod_work_dur, active_transport_dur, active_mod_rec_dur, 
+    active_total, active_vig_dur,
+    # Weight/Obesity
+    bmi, bmi_cat, weight_self, weight_self_wish,
+    weight_need_ever, weight_need_exercise, weight_need_salt, 
+    weight_need_fat, 
+    weight_act_now, weight_act_now_exercise, weight_act_now_salt, 
+    weight_act_now_fat,  
+    weight_act_year, weight_act_year_cut, weight_act_year_calories, 
+    weight_act_year_fat, weight_act_year_exercise, weight_act_year_skip, 
+    weight_act_year_product, weight_act_year_liquid, weight_act_year_program,
+    weight_act_year_rx, weight_act_year_nonrx, weight_act_year_purge, 
+    weight_act_year_water, weight_act_year_diet, weight_act_year_carbs, 
+    weight_act_year_smoke, weight_act_year_veg, weight_act_year_habits, 
+    weight_act_year_sweets, weight_act_year_junk, weight_act_year_surgery, 
+    weight_act_year_other,
+    # RX
+    rx_use, rx_lipid, rx_count_lipid, rx_count_total, rx_statin, rx_pcks9, 
+    rx_fibrate, rx_sequestrant, rx_supplement, rx_other, rx_non_lipid
+  )
+```
+
+### 💾 Save the Data
+
+We saved our combined, cleaned data set into RDS format.
+
+```{r}
+saveRDS(combined_data, here('data', 'combined_data.rds'))
+```
+
+```{r}
+rm(combined_data)
+rm(nhanes_data)
+rm(rx_data)
+```
+

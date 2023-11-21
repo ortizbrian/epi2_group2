@@ -1,0 +1,890 @@
+---
+title: "Data Exploration - Variable Distributions"
+date: "2022-11-08 <br> Updated: `r Sys.Date()`"
+format: pdf
+editor: 
+  markdown: 
+    wrap: sentence
+---
+
+# ⭐️Overview
+
+This file seeks to perform initial exploration of the NHANES data, focused on the distribution of variables
+
+## 🕒 Change Log
+
+**2023-11-08**, file initialized
+
+# 📦 Load packages & Functions
+
+```{r, message=FALSE, warning=FALSE}
+library(here, warn.conflicts = FALSE)
+library(tidyverse, warn.conflicts = FALSE)
+library(mice, warn.conflicts = FALSE)
+```
+
+```{r}
+source(here("R", "summary_stats_table.R"))
+```
+
+## 📥 Import the Data
+
+We imported our cleaned NHANES data set.
+
+```{r}
+nhanes_path <- here('data', 'combined_data.rds')
+nhanes_data <- readRDS(nhanes_path)
+
+# Print a message for when this file is being sourced
+cat(
+  paste0(Sys.Date(), ":"),
+  "NHANES data imported with", nrow(nhanes_data), "rows and", 
+  ncol(nhanes_data), "columns. \n",
+  "Data last modified: ", as.character(file.info(nhanes_path)$mtime), "\n"
+)
+
+# 2023-11-09: NHANES data imported with 7122 rows and 105 columns. 
+#  Data last modified:  2023-11-09 12:00:16 
+```
+
+# All Subjects
+
+## Continuous Variable Distributions
+
+Overall, we determined that:
+
+-   Income Ratio (`income_ratio`) was not approximately normally distributed, with a bimodal distribution due to significant outliers at 5.
+
+-   Age (`age`) was approximately normally distributed
+
+-   Age at diagnosis of cardiac diseases were either approximately distributed, or had left skew
+
+    -   Age at diagnosis of CHF, CAD, and CVA (`cvd_chf_age`, `cvd_cad_age`, `cvd_cva_age`)demonstrated left skew.
+
+    -   Age at diagnosis of Angina, MI (`cvd_angina_age`, `cvd_mi_age`) were approximately normal
+
+-   Alcoholic drinks per day (`alc_per_day`), BMI (`bmi`), total number of prescriptions (`rx_count_total`), and all activity variables (`active_mod_work_dur`, `active_transport_dur`, `active_mod_rec_dur`, `active_vig_dur`, `active_total`) had significant right skew
+
+-   The total number of lipid-lowering medications had such a low range of values, it was functionally categorical.
+
+### Income Ratio
+
+Income ratio was not approximately distributed.
+
+Histogram with significant right skew.
+Bimodal distribution, likely due to NHANES consolidating all values over 5 to 5.
+
+```{r}
+hist(nhanes_data$income_ratio)
+```
+
+Boxplot appears to have right skew, no identified outliers.
+
+```{r}
+boxplot(nhanes_data$income_ratio)
+```
+
+QQ plot indicates significant deviation.
+
+```{r}
+qqnorm(nhanes_data$income_ratio)
+qqline(nhanes_data$income_ratio)
+```
+
+### Age
+
+Age was approximately normally distributed.
+
+Histogram appears nearly unimodal.
+
+```{r}
+hist(nhanes_data$age)
+```
+
+Boxplot appears equal and normally distributed.
+
+```{r}
+boxplot(nhanes_data$age)
+```
+
+QQ plot indicates a close fit to the normal approximation line.
+
+```{r}
+qqnorm(nhanes_data$age)
+qqline(nhanes_data$age)
+```
+
+### Age at Diagnosis of CHF
+
+Age at diagnosis of CHF not approximately normally distributed.
+
+Histogram with a unimodal distribution, with left skew.
+
+```{r}
+hist(nhanes_data$cvd_chf_age)
+```
+
+Boxplot deonstrated a distribution with slight left skew.
+
+```{r}
+boxplot(nhanes_data$cvd_chf_age)
+```
+
+QQ appeared to closely follow the normal distribution line, with notable deviation in the far positive range of values.
+
+```{r}
+qqnorm(nhanes_data$cvd_chf_age)
+qqline(nhanes_data$cvd_chf_age)
+```
+
+### Age at Diagnosis of CAD
+
+Age at diagnosis of CAD not approximately normally distributed.
+
+Histogram with a unimodal distribution with slight left skew.
+
+```{r}
+hist(nhanes_data$cvd_cad_age)
+```
+
+Boxplot demonstrated a deviation with slight left skew, and outlier to the far negative range of values.
+
+```{r}
+boxplot(nhanes_data$cvd_cad_age)
+```
+
+QQ appeared to closely follow the normal distribution line, with slight deviation in the extremes of values.
+
+```{r}
+qqnorm(nhanes_data$cvd_cad_age)
+qqline(nhanes_data$cvd_cad_age)
+```
+
+### Age at Diagnosis of Angina
+
+Age at diagnosis of angina was approximately normally distributed.
+
+Histogram with a unimodal, approximately normal distribution.
+
+```{r}
+hist(nhanes_data$cvd_angina_age)
+```
+
+Boxplot with an approximately normal distribution
+
+```{r}
+boxplot(nhanes_data$cvd_angina_age)
+```
+
+QQ appeared to closely follow the normal line,with slight deviation at the extremes of values.
+
+```{r}
+qqnorm(nhanes_data$cvd_angina_age)
+qqline(nhanes_data$cvd_angina_age)
+```
+
+### Age at Diagnosis of MI
+
+Age at diagnosis of Myocardial Infarction was approximately normally distributed.
+
+Histogram with a unimodal distribution, with slight right skew.
+
+```{r}
+hist(nhanes_data$cvd_mi_age)
+```
+
+Boxplot with an approximately normal distribution, with outlier to the far negative range of values.
+
+```{r}
+boxplot(nhanes_data$cvd_mi_age)
+```
+
+QQ that appeared to closely fit the distribution line, with slight skew at the extremes of values.
+
+```{r}
+qqnorm(nhanes_data$cvd_mi_age)
+qqline(nhanes_data$cvd_mi_age)
+```
+
+### Age at Diagnosis of CVA
+
+Age at diagnosis of cerebrovascular accident was not approximately normally distributed.
+
+Histogram with a significant unimodal (questionably bimodal) distribution with left skew.
+
+```{r}
+hist(nhanes_data$cvd_cva_age)
+```
+
+Boxplot demonstrating a slight left skew, without outliers.
+
+```{r}
+boxplot(nhanes_data$cvd_cva_age)
+```
+
+QQ with significant deviation to both extremes of values, primarily at the lower range.
+
+```{r}
+qqnorm(nhanes_data$cvd_cva_age)
+qqline(nhanes_data$cvd_cva_age)
+```
+
+### BMI
+
+BMI not approximately normally distributed.
+
+Histogram with a unimodal peak, and significantly right skew (primarily a long tail)
+
+```{r}
+hist(nhanes_data$bmi)
+```
+
+Boxplot demonstrating significant right skew, with many outliers to the far positive range of values.
+
+```{r}
+boxplot(nhanes_data$bmi)
+```
+
+QQ with significant deivation at both extremes of values
+
+```{r}
+qqnorm(nhanes_data$bmi)
+qqline(nhanes_data$bmi)
+```
+
+### Alcoholic Drinks per Day
+
+alc_per_day not approximately normally distributed.
+
+Histogram with a unimodal peak and significant right skew.
+
+```{r}
+hist(nhanes_data$alc_per_day)
+```
+
+Boxplot with significant right skew, and outliers to the far positive range of values.
+
+```{r}
+boxplot(nhanes_data$alc_per_day)
+```
+
+QQ demonstrated significant deivation, primarily in the far positive range of values.
+
+```{r}
+qqnorm(nhanes_data$alc_per_day)
+qqline(nhanes_data$alc_per_day)
+```
+
+### Count of Lipid Medications
+
+The total number of lipid-lowering medications taken by a subject not approximately normally distributed.
+
+Histogram with unimodal peak of such significance that all others are likely outliers.
+
+```{r}
+hist(nhanes_data$rx_count_lipid)
+```
+
+Boxplot appears to indicate that all values aside from 1 are significant outliers
+
+```{r}
+boxplot(nhanes_data$rx_count_lipid)
+```
+
+QQ demonstrates significant deivation at both extremes of values, but primarily the postiive range.
+
+```{r}
+qqnorm(nhanes_data$rx_count_lipid)
+qqline(nhanes_data$rx_count_lipid)
+```
+
+### Count of Total Medications
+
+The total number of lipid-lowering medications taken by a subject not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew
+
+```{r}
+hist(nhanes_data$rx_count_total)
+```
+
+Boxplot with significant right skew, and outliers to the far positive range of values
+
+```{r}
+boxplot(nhanes_data$rx_count_total)
+```
+
+QQ with significant deivation at the far range of values.
+
+```{r}
+qqnorm(nhanes_data$rx_count_total)
+qqline(nhanes_data$rx_count_total)
+```
+
+### Total Number of Moderate Active Minutes at Work per Week
+
+The number of moderate activity minutes per week occuring at work for a subject was/not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew.
+
+```{r}
+hist(nhanes_data$active_mod_work_dur)
+```
+
+Boxplot with significant right skew, and many outliers to the far positive range of values.
+
+```{r}
+boxplot(nhanes_data$active_mod_work_dur)
+```
+
+QQ significant deviation in both extremes of values.
+
+```{r}
+qqnorm(nhanes_data$active_mod_work_dur)
+qqline(nhanes_data$active_mod_work_dur)
+```
+
+### Total Number of Active Transport Minutes per Week
+
+The number of minutes in active transport for a subject not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew.
+
+```{r}
+hist(nhanes_data$active_transport_dur)
+```
+
+Boxplot with significant right skew, and many outliers in the far positive range of values.
+
+```{r}
+boxplot(nhanes_data$active_transport_dur)
+```
+
+QQ demonstrating significant deviation at both extremes of values.
+
+```{r}
+qqnorm(nhanes_data$active_transport_dur)
+qqline(nhanes_data$active_transport_dur)
+```
+
+### Total Number of Moderate Active Minutes in Recreation per Week
+
+The number of moderate activity minutes per week occuring in recreation for a subject not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew.
+
+```{r}
+hist(nhanes_data$active_mod_rec)
+```
+
+Boxplot demonstrating significant right skew, with many outliers to the far positive ranges of values
+
+```{r}
+boxplot(nhanes_data$active_mod_rec)
+```
+
+QQ demonstrating significant deviation in the far positive range of values.
+
+```{r}
+qqnorm(nhanes_data$active_mod_rec)
+qqline(nhanes_data$active_mod_rec)
+```
+
+### Total Number of Vigorous Active Minutes per Week
+
+The number of vigorous activity minutes per week for a subject not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew
+
+```{r}
+hist(nhanes_data$active_vig_dur)
+```
+
+Boxplot with significant right skew, and many outliers in the far positive range of values
+
+```{r}
+boxplot(nhanes_data$active_vig_dur)
+```
+
+QQ with significant deivation at both extremes of values.
+
+```{r}
+qqnorm(nhanes_data$active_vig_dur)
+qqline(nhanes_data$active_vig_dur)
+```
+
+### Total Number of Active Minutes per Week
+
+The number of activite minutes per week for a subject not approximately normally distributed.
+
+Histogram with a unimodal distribution with significant right skew.
+
+```{r}
+hist(nhanes_data$active_total)
+```
+
+Boxplot demonstrated significant right skew, with many outliers in the far positive range.
+
+```{r}
+boxplot(nhanes_data$active_total)
+```
+
+QQ demonstrated strong deivation at the positive range of values
+
+```{r}
+qqnorm(nhanes_data$active_total)
+qqline(nhanes_data$active_total)
+```
+
+## Summary Statistics
+
+We generated our table of summary statistics.
+
+```{r}
+summary_stats_table(
+  t_df = nhanes_data, 
+  cont_mean_cols = c(
+    'age', 'cvd_mi_age', 'cvd_angina_age'
+    ),
+  cont_median_cols = c(
+    'income_ratio', 'cvd_chf_age', 'cvd_cad_age', 'cvd_cva_age',
+    'bmi', 'alc_per_day', 'rx_count_total', 'active_mod_work_dur',
+    'active_transport_dur', 'active_mod_rec_dur', 'active_vig_dur',
+    'active_total'
+  ),
+  cat_cols = setdiff(
+    colnames(nhanes_data),
+    c('id', 'age', 'cvd_mi_age', 'cvd_angina_age',
+      'income_ratio', 'cvd_chf_age', 'cvd_cad_age', 'cvd_cva_age',
+      'bmi', 'alc_per_day', 'rx_count_total', 'active_mod_work_dur',
+      'active_transport_dur', 'active_mod_rec_dur', 'active_vig_dur',
+      'active_total'
+      )
+    ),
+  num_digits = 1
+  )
+```
+
+# Included Subjects Only
+
+## Continuous Variable Distributions
+
+Overall, we determined that:
+
+-   Income Ratio (`income_ratio`) was not approximately normally distributed, with a bimodal distribution due to significant outliers at 5.
+
+-   **Age** (`age`) was not approximately normally distributed, as there was now significant left skew.
+
+-   Age at diagnosis of cardiac diseases were either approximately distributed, or had left skew
+
+    -   Age at diagnosis of CHF, and CVA (`cvd_chf_age`, `cvd_cva_age`)demonstrated left skew.
+
+    -   Age at diagnosis of Angina, **CAD**, and MI (`cvd_angina_age`, `cvd_cad_age`, `cvd_mi_age`) were approximately normal 
+
+-   Alcoholic drinks per day (`alc_per_day`), BMI (`bmi`), total number of prescriptions (`rx_count_total`), and all activity variables (`active_mod_work_dur`, `active_transport_dur`, `active_mod_rec_dur`, `active_vig_dur`, `active_total`) had significant right skew
+
+-   The total number of lipid-lowering medications had such a low range of values, it was functionally categorical.
+
+### Income Ratio
+
+Income ratio was not approximately distributed.
+
+Histogram with significant right skew.
+Bimodal distribution, likely due to NHANES consolidating all values over 5 to 5.
+
+```{r}
+hist(included_data$income_ratio)
+```
+
+Boxplot appears to have slight right skew, no identified outliers.
+
+```{r}
+boxplot(included_data$income_ratio)
+```
+
+QQ plot indicates significant deviation at the extremes of values.
+
+```{r}
+qqnorm(included_data$income_ratio)
+qqline(included_data$income_ratio)
+```
+
+### Age
+
+Age was not approximately normally distributed.
+
+Histogram appears fairly unimodal (borderline bimodal), with left skew.
+
+```{r}
+hist(included_data$age)
+```
+
+Boxplot appears to indicate left skew, with outliers to the negative range of values.
+
+```{r}
+boxplot(included_data$age)
+```
+
+QQ plot indicates significant deviation at the lower range of values.
+
+```{r}
+qqnorm(included_data$age)
+qqline(included_data$age)
+```
+
+### Age at Diagnosis of CHF
+
+Age at diagnosis of CHF not approximately normally distributed.
+
+Histogram with a unimodal distribution, with left skew.
+
+```{r}
+hist(included_data$cvd_chf_age)
+```
+
+Boxplot deonstrated a distribution with slight left skew, and a single outlier to the far negative range of values.
+
+```{r}
+boxplot(included_data$cvd_chf_age)
+```
+
+QQ appeared to mostly follow the normal distribution line, with greater deviance in the extremes of values.
+
+```{r}
+qqnorm(included_data$cvd_chf_age)
+qqline(included_data$cvd_chf_age)
+```
+
+### Age at Diagnosis of CAD
+
+Age at diagnosis of CAD was approximately normally distributed.
+
+Histogram with a unimodal distribution with slight left skew.
+
+```{r}
+hist(included_data$cvd_cad_age)
+```
+
+Boxplot demonstrated a deviation with slight left skew, and outlier to the far negative range of values.
+
+```{r}
+boxplot(included_data$cvd_cad_age)
+```
+
+QQ appeared to closely follow the normal distribution line, with slight deviation in the extremes of values.
+
+```{r}
+qqnorm(included_data$cvd_cad_age)
+qqline(included_data$cvd_cad_age)
+```
+
+### Age at Diagnosis of Angina
+
+Age at diagnosis of angina was approximately normally distributed.
+
+Histogram with a unimodal, approximately normal distribution.
+
+```{r}
+hist(included_data$cvd_angina_age)
+```
+
+Boxplot with an approximately normal distribution
+
+```{r}
+boxplot(included_data$cvd_angina_age)
+```
+
+QQ appeared to closely follow the normal line,with slight deviation at the extremes of values.
+
+```{r}
+qqnorm(included_data$cvd_angina_age)
+qqline(included_data$cvd_angina_age)
+```
+
+### Age at Diagnosis of MI
+
+Age at diagnosis of Myocardial Infarction was approximately normally distributed.
+
+Histogram with a unimodal distribution, with slight left skew
+
+```{r}
+hist(included_data$cvd_mi_age)
+```
+
+Boxplot with an approximately normal distribution, with outlier to the far negative range of values.
+
+```{r}
+boxplot(included_data$cvd_mi_age)
+```
+
+QQ that appeared to closely fit the distribution line, with slight skew at the extremes of values.
+
+```{r}
+qqnorm(included_data$cvd_mi_age)
+qqline(included_data$cvd_mi_age)
+```
+
+### Age at Diagnosis of CVA
+
+Age at diagnosis of cerebrovascular accident was not approximately normally distributed.
+
+Histogram with a significant unimodal distribution with left skew.
+
+```{r}
+hist(included_data$cvd_cva_age)
+```
+
+Boxplot demonstrating a slight left skew, with outliers to the far negative range of values.
+
+```{r}
+boxplot(included_data$cvd_cva_age)
+```
+
+QQ with significant deviation to both extremes of values, primarily at the lower range.
+
+```{r}
+qqnorm(included_data$cvd_cva_age)
+qqline(included_data$cvd_cva_age)
+```
+
+### BMI
+
+BMI not approximately normally distributed.
+
+Histogram with a unimodal peak, and significantly right skew (primarily a long tail)
+
+```{r}
+hist(included_data$bmi)
+```
+
+Boxplot demonstrating significant right skew, with many outliers to the far positive range of values.
+
+```{r}
+boxplot(included_data$bmi)
+```
+
+QQ with significant deivation at both extremes of values
+
+```{r}
+qqnorm(included_data$bmi)
+qqline(included_data$bmi)
+```
+
+### Alcoholic Drinks per Day
+
+alc_per_day not approximately normally distributed.
+
+Histogram with a unimodal peak and significant right skew.
+
+```{r}
+hist(included_data$alc_per_day)
+```
+
+Boxplot with significant right skew, and outliers to the far positive range of values.
+
+```{r}
+boxplot(included_data$alc_per_day)
+```
+
+QQ demonstrated significant deivation, primarily in the far positive range of values.
+
+```{r}
+qqnorm(included_data$alc_per_day)
+qqline(included_data$alc_per_day)
+```
+
+### Count of Lipid Medications
+
+The total number of lipid-lowering medications taken by a subject not approximately normally distributed.
+
+Histogram with unimodal peak of such significance that all others are likely outliers.
+
+```{r}
+hist(included_data$rx_count_lipid)
+```
+
+Boxplot appears to indicate that all values aside from 1 are significant outliers
+
+```{r}
+boxplot(included_data$rx_count_lipid)
+```
+
+QQ demonstrates significant deivation at both extremes of values, but primarily the postiive range.
+
+```{r}
+qqnorm(included_data$rx_count_lipid)
+qqline(included_data$rx_count_lipid)
+```
+
+### Count of Total Medications
+
+The total number of lipid-lowering medications taken by a subject not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew
+
+```{r}
+hist(included_data$rx_count_total)
+```
+
+Boxplot with significant right skew, and outliers to the far positive range of values
+
+```{r}
+boxplot(included_data$rx_count_total)
+```
+
+QQ with significant deivation at the far range of values.
+
+```{r}
+qqnorm(included_data$rx_count_total)
+qqline(included_data$rx_count_total)
+```
+
+### Total Number of Moderate Active Minutes at Work per Week
+
+The number of moderate activity minutes per week occuring at work for a subject was/not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew.
+
+```{r}
+hist(included_data$active_mod_work_dur)
+```
+
+Boxplot with significant right skew, and many outliers to the far positive range of values.
+
+```{r}
+boxplot(included_data$active_mod_work_dur)
+```
+
+QQ significant deviation in both extremes of values.
+
+```{r}
+qqnorm(included_data$active_mod_work_dur)
+qqline(included_data$active_mod_work_dur)
+```
+
+### Total Number of Active Transport Minutes per Week
+
+The number of minutes in active transport for a subject not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew.
+
+```{r}
+hist(included_data$active_transport_dur)
+```
+
+Boxplot with significant right skew, and many outliers in the far positive range of values.
+
+```{r}
+boxplot(included_data$active_transport_dur)
+```
+
+QQ demonstrating significant deviation at both extremes of values.
+
+```{r}
+qqnorm(included_data$active_transport_dur)
+qqline(included_data$active_transport_dur)
+```
+
+### Total Number of Moderate Active Minutes in Recreation per Week
+
+The number of moderate activity minutes per week occuring in recreation for a subject not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew.
+
+```{r}
+hist(included_data$active_mod_rec)
+```
+
+Boxplot demonstrating significant right skew, with many outliers to the far positive ranges of values
+
+```{r}
+boxplot(included_data$active_mod_rec)
+```
+
+QQ demonstrating significant deviation in the far positive range of values.
+
+```{r}
+qqnorm(included_data$active_mod_rec)
+qqline(included_data$active_mod_rec)
+```
+
+### Total Number of Vigorous Active Minutes per Week
+
+The number of vigorous activity minutes per week for a subject not approximately normally distributed.
+
+Histogram with a unimodal peak with significant right skew
+
+```{r}
+hist(included_data$active_vig_dur)
+```
+
+Boxplot with significant right skew, and many outliers in the far positive range of values
+
+```{r}
+boxplot(included_data$active_vig_dur)
+```
+
+QQ with significant deivation at both extremes of values.
+
+```{r}
+qqnorm(included_data$active_vig_dur)
+qqline(included_data$active_vig_dur)
+```
+
+### Total Number of Active Minutes per Week
+
+The number of activite minutes per week for a subject not approximately normally distributed.
+
+Histogram with a unimodal distribution with significant right skew.
+
+```{r}
+hist(included_data$active_total)
+```
+
+Boxplot demonstrated significant right skew, with many outliers in the far positive range.
+
+```{r}
+boxplot(included_data$active_total)
+```
+
+QQ demonstrated strong deivation at the positive range of values
+
+```{r}
+qqnorm(included_data$active_total)
+qqline(included_data$active_total)
+```
+
+## Summary Statistics
+
+We generated our table of summary statistics.
+
+```{r}
+summary_stats_table(
+  t_df = included_data, 
+  cont_mean_cols = c(
+    'age', 'cvd_mi_age', 'cvd_angina_age'
+    ),
+  cont_median_cols = c(
+    'income_ratio', 'cvd_chf_age', 'cvd_cad_age', 'cvd_cva_age',
+    'bmi', 'alc_per_day', 'rx_count_total', 'active_mod_work_dur',
+    'active_transport_dur', 'active_mod_rec_dur', 'active_vig_dur',
+    'active_total'
+  ),
+  cat_cols = setdiff(
+    colnames(included_data),
+    c('id', 'age', 'cvd_mi_age', 'cvd_angina_age',
+      'income_ratio', 'cvd_chf_age', 'cvd_cad_age', 'cvd_cva_age',
+      'bmi', 'alc_per_day', 'rx_count_total', 'active_mod_work_dur',
+      'active_transport_dur', 'active_mod_rec_dur', 'active_vig_dur',
+      'active_total'
+      )
+    ),
+  num_digits = 1
+  )
+```
+
+
+
+
+
+
