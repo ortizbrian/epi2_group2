@@ -1,5 +1,5 @@
 ---
-title: "Data Analysis Section"
+title: "Epi 3 Data Analysis"
 author: "Qiheng(Michael) Yan"
 date: "2023-11-21"
 output: pdf_document
@@ -19,7 +19,7 @@ library(expss)
 set.seed(1028)
 ```
 
-# Epi 3 Data Analysis
+# Epi 3 Data Analysis Section 1
 
 ## This section ignores the inclusion/exclusion criteria and uses all 7122 subjects (using complete_data)
 
@@ -277,6 +277,8 @@ Given these results, the significant predictors in this model are income level a
 
 
 
+# Epi 3 Data Analysis Section 2
+
 ## This section follows the inclusion/exclusion criteria and uses a subset of 1168 subjects (using subset_1168_data)
 
 ### Bivariate Analysis
@@ -424,6 +426,8 @@ These visualizations effectively communicate the relationships and trends that w
 
 These visualizations highlight critical associations between socioeconomic factors, insurance coverage, demographic characteristics, and medication adherence. They serve as an essential complement to the statistical analyses, providing a clear and interpretable depiction of the data that can guide targeted interventions and policy-making to improve adherence rates and reduce health disparities.
 
+Based on the bivariate analysis results, several trends and relationships emerge in the context of adherence to cholesterol medication. Age stands out as a significant factor, with older individuals showing a higher likelihood of medication adherence. This pattern indicates a potential increase in health awareness or medication compliance with age. The analysis also suggests a possible association between adherence and gender, albeit less pronounced than age, indicating potential behavioral differences in medication compliance between males and females. While income, insurance status, and race/ethnicity were explored, their relationships with adherence in the bivariate analysis were not consistently significant, suggesting that these factors' influence on adherence may be more complex and possibly intertwined with other variables. The bivariate analysis provides an initial understanding of the factors influencing medication adherence but also highlights the need for more nuanced multivariate analyses to unravel the interplay between these various demographic and socioeconomic factors.
+
 ### Multivariate Analysis
 Next, we'll conduct a logistic regression analysis to assess the relationship between family income and medication adherence, controlling for confounders.
 ```{r}
@@ -559,7 +563,9 @@ print(lr_plot)
 
 This plot is not informative as some ORs are really large and some CIs are really wide. 
 
-### Stratified analyses
+The multivariate analysis of factors influencing adherence to cholesterol medication yields insightful findings. Age consistently emerges as a significant predictor across various models, reinforcing the trend that older individuals are more likely to adhere to their medication regimen. This finding suggests a greater health consciousness or prioritization of medication adherence with increasing age. Income's relationship with adherence presents a more complex picture; it appears significant in some stratified analyses, indicating that financial status may play a role in adherence, though the nature of this relationship is not straightforward and varies across different demographic groups. Gender, race/ethnicity, and insurance status, while included in the models, do not consistently show a significant independent impact on adherence, suggesting that these factors' influence might be more nuanced or overshadowed by other variables like age. The multivariate analysis underscores the complexity of medication adherence behavior, highlighting that it is influenced by a combination of demographic and socioeconomic factors, with age being the most prominent predictor in this study.
+
+### Stratified Analyses
 ```{r}
 # Stratified analysis by race/ethnicity
 stratified_by_race <- subset_1168_data %>%
