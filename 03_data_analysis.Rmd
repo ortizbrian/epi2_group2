@@ -185,7 +185,7 @@ summary(lr_model)
 
 The output from the logistic regression model provides several pieces of information that can be interpreted to understand the factors associated with adherence to cholesterol medication:
 
-1. Income Category (income_cat.L): The linear term for income category is significant (p = 0.0263), suggesting that as income increases, the log-odds of being adherent to cholesterol medication also increase. The positive coefficient (Estimate = 0.276106) indicates a positive relationship between higher income levels and adherence.
+1. Income Category (income_cat.L): The linear term for income category is significant (p = 0.0263), suggesting that as income increases, the log-odds of being adherent to cholesterol medication also increase. The positive coefficient (log-odds) (Estimate = 0.276106) indicates a positive relationship between higher income levels and adherence.
 
 2. Health Insurance Classification (ins_classif): None of the terms for health insurance classification are statistically significant, as all p-values are well above the conventional alpha level of 0.05. This suggests that within this model, health insurance classification is not a significant predictor of medication adherence when controlling for other factors.
 
@@ -204,4 +204,51 @@ The output from the logistic regression model provides several pieces of informa
 9. Missingness: A large number of observations were deleted due to missingness (5918 observations), which could significantly affect the results. It's important to investigate the missing data pattern to ensure that it is not biasing the results.
 
 Overall, income and age seem to be significant factors associated with adherence to cholesterol medication in this multivariate context. The significance of income suggests a possible socioeconomic gradient in medication adherence. The relationship with age could reflect better health habits or more regular healthcare usage among older individuals. It is crucial to consider the context of these results and the potential impact of missing data on the study's findings. Further analysis might involve exploring interactions between variables, considering non-linear relationships, and addressing the issue of missing data, possibly through imputation methods or sensitivity analyses.
+
+```{r}
+# Calculate Odds Ratios and 95% Confidence Intervals
+or <- exp(coef(lr_model))
+# Wald Confidence Intervals and p-values
+se <- sqrt(diag(vcov(lr_model)))
+wald_ci_lower <- exp(coef(lr_model) - 1.96 * se)
+wald_ci_upper <- exp(coef(lr_model) + 1.96 * se)
+p_values <- summary(lr_model)$coefficients[, "Pr(>|z|)"]
+
+# Create a data frame to nicely format the results
+results <- data.frame(
+  OR = exp(coef(lr_model)),
+  LowerCI = wald_ci_lower,
+  UpperCI = wald_ci_upper,
+  PValue = p_values
+)
+
+# View the results
+print(results)
+```
+
+```{r}
+####### Uncomment this chunk to generate the multivariate results table #######
+# # Load the required packages
+# library(knitr)
+# library(kableExtra)
+# 
+# # Create a nice looking table to present the above ORs, CIs, and p-values
+# nice_table <- kable(results, 
+#                     format = "latex",  # Use "latex" for PDF output or "pipe" for Markdown or "html" for HTML
+#                     digits = 3,       # Number of decimal places
+#                     align = 'c',      # Center align the columns
+#                     caption = "Multivariate Analysis of Factors Associated with Adherence to Cholesterol Medication") %>%
+#   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+#                 full_width = F, 
+#                 position = "center") %>%
+#   column_spec(1, bold = T) %>%         # Make the OR column bold
+#   column_spec(2:4, color = "blue") %>% # Color the CI columns blue
+#   scroll_box(width = "100%", height = "2000px") # Add a scroll box if the table is too large
+# 
+# # Print the table
+# nice_table
+# 
+# # To display this table outside of an R Markdown document, save it to an HTML file and open it in a web browser
+# save_kable(nice_table, file = "NiceTable.html")
+```
 
