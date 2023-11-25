@@ -47,14 +47,6 @@ This file achieves pre-processing and cleaning of the NHANES data sets.
 
 -   Subjects with any exclusion (or lack of inclusion) criteria, or missing any value for the outcome variable were flagged for exclusion in `drop_flag`
 
-## 🕒 Change Log
-
-**2023-11-06**, file initialized. Data sets cleaned, filtered, and merged into a single data set for analysis.
-
-**2023-11-08**, revised drop criteria; added BMI calculation check. Revised calculated vars to have 'FALSE' appropriately.
-
-**2023-11-09**, revised race, ensured labels appropriately added to variables.
-
 # 📦 Load packages & Functions
 
 ```{r, message=FALSE, warning=FALSE}
