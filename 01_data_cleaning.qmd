@@ -62,6 +62,7 @@ library(here, warn.conflicts = FALSE)
 library(readxl, warn.conflicts = FALSE)
 library(openxlsx, warn.conflicts = FALSE)
 library(tidyverse, warn.conflicts = FALSE)
+library(codebookr, warn.conflicts = FALSE)
 ```
 
 ## 📥 Import the Data
@@ -949,9 +950,6 @@ nhanes_data <- nhanes_data |>
          ins_govt_chip | ins_govt_state | ins_govt_other), TRUE, FALSE
       )
     )
-
-attributes(nhanes_data[['ins_govt']])$label <- 
-  'Covered by government insurance'
 ```
 
 We examined rows with more than one insurance listed. Unfortunately, since [Medicare may be primary or secondary](https://www.medicare.gov/supplements-other-insurance/how-medicare-works-with-other-insurance), we cannot classify Medicare as the dominant insurance where it co-occurs with private insurance. [Medicaid is typically](https://www.macpac.gov/subtopic/how-medicaid-interacts-with-other-payers/), but not always, a 'payer of last resort' (secondary). As such, there's no real way to consolidate individuals with both private and government insurance into a single category.
@@ -993,6 +991,7 @@ We created a categorical variable for insurance type as an ordered factor.
   )
 
 attributes(nhanes_data[['ins_type']])$label <- 'Health Insurance Type'
+
 ```
 
 We then made a further categorical indicating the totality of a participant's health insurance coverage (type and drug coverage inclusion).
@@ -1061,9 +1060,28 @@ nhanes_data <- nhanes_data |>
     !is.na(ins_type) & (ins_type != 'Uninsured') ~ TRUE,
     is.na(ins_type) ~ NA
     )
+  ) |>
+  select(-ins_dichot_original)
+
+# Attributes dropped in calculation
+attributes(nhanes_data[['ins_govt']])$label <- 
+  paste0(
+  'Subject reported coverage by government health insurance',
+  ' (Medicaire, Medicaid, Medigap, CHIP, State plan, other)'
+  )
+attributes(nhanes_data[['ins_private']])$label <- 
+  paste0(
+  'Subject reported coverage by private health insurance'
+  )
+attributes(nhanes_data[['ins_none']])$label <- 
+  paste0(
+  'Subject reported they had no health insurance coverage (Uninsured)'
+  )
+attributes(nhanes_data[['ins_dichot']])$label <- 
+  paste0(
+  'Subject reported any form of health insurance?'
   )
 
-attributes(nhanes_data[['ins_dichot']])$label <- 'Any insurance'
 ```
 
 ### Alcohol Use
@@ -1147,6 +1165,7 @@ We verified the Teaching Team created variable `cvd_hx` by comparing to a newly 
 
 ```{r}
 nhanes_data |>
+  rowwise() |>
   mutate(cvd_val = case_when(
     cvd_chf_ever ~ TRUE,
     cvd_cad_ever ~ TRUE,
@@ -1171,6 +1190,7 @@ We overrode the original teaching team variable with our recalculated value.
 
 ```{r}
 nhanes_data <- nhanes_data |>
+  rowwise() |>
   mutate(cvd_hx = case_when(
     cvd_chf_ever ~ TRUE,
     cvd_cad_ever ~ TRUE,
@@ -1183,7 +1203,10 @@ nhanes_data <- nhanes_data |>
       cvd_cva_ever, na.rm = TRUE
       ) == 0 ~ FALSE,
     TRUE ~ NA
-  ))
+  )) |>
+  ungroup()
+
+attributes(nhanes_data$cvd_hx)$label <- 'Subject reported comorbid cardiovascular disease (CAD, CHF, Angina, MI, CVA)'
 ```
 
 ### BMI Classification
@@ -1389,7 +1412,6 @@ rx_data <- rx_data |>
       ~replace_na(., FALSE)
       )
     )
-      
 ```
 
 We compared the teaching-team calculated `COUNT` to our newly created `rx_lipid_count`. We found that several non-lipid-lowering medications were counted as lipid-lowering, because of subjects that were also taking non-lipid-lowering medications or a subject reported a medication was taken for cholesterol (when it was not a medication indicated for cholesterol).
@@ -1415,6 +1437,10 @@ rx_data <- rx_data |>
       is.na(rx_use) ~ NA
     )
   )
+
+attributes(rx_data[['rx_use']])$label <- paste0(
+  'Subject reported taking a prescription medication in the past month'
+  )   
 ```
 
 
@@ -1487,6 +1513,7 @@ combined_data <- combined_data |>
 
 nrow(combined_data |>
   filter(drop_flag)) - 5631
+# 323
 ```
 
 This has left 1,168 subjects for analysis. Due to this smaller size, the excluded rows have not been dropped, but the flag kept in the data set.
@@ -1500,9 +1527,6 @@ attributes(combined_data[['drop_flag']])$label <- paste(
 nrow(combined_data |>
        filter(!drop_flag))
 # 1168
-
-subet_1168<-combined_data |>
-       filter(!drop_flag)
 ```
 
 # Reordering Variables
@@ -1523,7 +1547,7 @@ combined_data <- combined_data |>
     # Exposure of Interest: Income
     income_ratio, income_cat,
     # Insurance
-    ins_dichot_original, ins_dichot, ins_classif, ins_type, ins_any_gap,
+    ins_dichot, ins_classif, ins_type, ins_any_gap,
     ins_private, ins_govt, ins_none, ins_rx,
     ins_govt_medicare, ins_govt_medigap, ins_govt_medicaid,
     ins_govt_chip, ins_govt_state, ins_govt_other,
@@ -1558,18 +1582,324 @@ combined_data <- combined_data |>
   )
 ```
 
-### 💾 Save the Data
+# Verifying Attributes
 
-We saved our combined, cleaned data set into RDS format.
+## Source
+We added the source attribute to all columns.
+
+```{r}
+for (var in colnames(combined_data)){
+  # Default Source Value
+  attributes(combined_data[[var]])$source <- 'NHANES data set'
+  
+  # RX Data Set Variables, Excluding ID
+  if (var %in% colnames(rx_data)[colnames(rx_data) != 'id']){
+    if (var %in% c('rx_count_total', 'rx_use')){
+      attributes(combined_data[[var]])$source <- 'RX Data Supplement'
+    }
+    else{
+      attributes(combined_data[[var]])$source <- paste0(
+        'Calculated from RX Data Supplement'
+        )
+    }
+  }
+  
+  # Calculated Variables
+  if(var %in% c(
+    'race_ethn_4cat', 'race_ethn_5cat', 'ins_type', 'ins_govt',
+    'ins_classif', 'alc_heavy', 'cvd_hx', 'drop_flag'
+    )){
+    attributes(combined_data[[var]])$source <- paste0(
+      'Calculated from NHANES data'
+    )
+  }
+  # Modified Variables
+  if(var %in% c('ins_private', 'ins_none', 'ins_dichot')){
+    attributes(combined_data[[var]])$source <- paste0(
+      'Significantly modified from NHANES data'
+    )
+  }
+  # Teaching Team Calculated Variables
+  if(var %in% c('smoking_hx', 'bmi_cat')){
+    attributes(combined_data[[var]])$source <- paste0(
+      'Calculated from NHANES data by teaching team'
+    )
+  }
+  # Teaching Team Modified Variables
+  if(var %in% c(
+    'age', 'sex', 'race_5cat', 'active_mod_work_dur', 'active_transport_dur',
+    'active_mod_rec_dur', 'active_vig_dur', 'active_total'
+    )){
+    attributes(combined_data[[var]])$source <- paste0(
+      'Significantly modified from NHANES data by Teaching Team'
+    )
+  }
+  
+}
+```
+
+## Label
+
+We further modified select labels for clarity.
+
+```{r}
+attributes(combined_data[['accult_time_usa']])$label <- paste0(
+  'Acculturation time in the US'
+  ) 
+attributes(combined_data[['educ_level']])$label <- paste0(
+  'Educational level'
+  )
+attributes(combined_data[['alc_freq']])$label <- paste0(
+  'How often do you consume alcohol? (Past 12 months)'
+  ) 
+attributes(combined_data[['alc_per_day']])$label <- paste0(
+  'When you drink alcohol, how many drinks do you have in one day?',
+  ' (Past 12 months)'
+  )
+attributes(combined_data[['active_vig_dur']])$label <- paste0(
+  'total minutes of vigorous physical activity per week'
+  )
+attributes(combined_data[['smoking_hx']])$label <- paste0(
+  'Smoking status'
+  )
+attributes(combined_data[['age']])$label <- paste0(
+  'Age (years)'
+  )
+attributes(combined_data[['sex']])$label <- paste0(
+  'Sex (Male/Female)'
+  )
+attributes(combined_data[['race_5cat']])$label <- paste0(
+  'Race from RIDRETH1'
+  )
+
+# Prefix for all alcohol items
+for (var in combined_data |> select(all_of(starts_with('alc_'))) |> names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'ALCOHOL: ', attributes(combined_data[[var]])$label
+  )
+}
+
+# Prefix for all insurance items
+for (var in combined_data |> select(all_of(starts_with('ins_'))) |> names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'INSURANCE: ', attributes(combined_data[[var]])$label
+  )
+}
+
+# Prefix for all CVD History items
+for (var in combined_data |> 
+     select(all_of(starts_with('cvd_hx'))) |> 
+     names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'CVD Hx: ', attributes(combined_data[[var]])$label
+  )
+}
+
+# Prefix for all Physical Activity items
+for (var in combined_data |> 
+     select(all_of(starts_with('active_'))) |> 
+     names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'Physical Activity: ', attributes(combined_data[[var]])$label
+  )
+}
+
+# Prefix for all RX Data items
+for (var in combined_data |> 
+     select(all_of(starts_with('rx_'))) |> 
+     names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'RX: ', attributes(combined_data[[var]])$label
+  )
+}
+
+# Prefix for all Weight Needs, Actions, Beliefs items
+for (var in combined_data |> 
+     select(all_of(starts_with('weight_need'))) |> 
+     names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'Weight Needs: ', attributes(combined_data[[var]])$label
+  )
+}
+
+for (var in combined_data |> 
+     select(all_of(starts_with('weight_act_now'))) |> 
+     names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'Weight Actions (currently): ', attributes(combined_data[[var]])$label
+  )
+}
+
+for (var in combined_data |> 
+     select(all_of(starts_with('weight_act_year'))) |> 
+     names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'Weight Actions (past 12 months): ', attributes(combined_data[[var]])$label
+  )
+}
+
+for (var in combined_data |> 
+     select(all_of(starts_with('weight_self'))) |> 
+     names()){
+  attributes(combined_data[[var]])$label <- paste0(
+  'Weight Self-Perception: ', attributes(combined_data[[var]])$label
+  )
+}
+```
+
+# Subset
+
+We created a subset that only featured our included subjects.
+
+```{r}
+subset_1168 <- combined_data |>
+       filter(!drop_flag)
+```
+
+# Label/Variable Reference Tables, Codebook
+
+### Combined Data
+
+We created a reference table for our combined data set, which featured the label, type, class, source, levels, number and percentage missing for all variables.
+
+```{r}
+combined_table <- tibble::tibble(
+  'var' = colnames(combined_data)
+  ) |>
+  rowwise() |>
+  mutate(
+  label = attributes(combined_data[[var]])$label,
+  type = typeof(combined_data[[var]]),
+  class = case_when(
+    'factor' %in% class(combined_data[[var]]) ~ 'factor',
+    'numeric' %in% class(combined_data[[var]]) ~ 'numeric, float',
+    'integer' %in% class(combined_data[[var]]) ~ 'numeric, integer',
+    'logical' %in% class(combined_data[[var]]) ~ 'logical'
+    ),
+  source = attributes(combined_data[[var]])$source,
+  num_missing = sum(is.na(combined_data[[var]]))
+  ) |>
+  mutate(levels = case_when(
+    class == 'factor' ~ paste0(
+      "'", 
+      paste(levels(combined_data[[var]]), collapse = "', '"), 
+      "'"),
+    class == 'logical' ~ "'TRUE', 'FALSE'",
+    TRUE ~ NA_character_
+    )
+  ) |>
+  mutate(
+    per_missing = round(num_missing*100/nrow(combined_data), digits = 4)
+  ) |>
+  relocate(var, num_missing, per_missing, label, type, class, levels, source) |>
+  rename_at(
+    c(
+      'var', 'label', 'type', 'class', 'levels', 'num_missing', 
+      'per_missing', 'source'
+      ), 
+    ~c(
+      'Variable Name', 'Label', 'Type', 'Class', 'Levels', 'Number Missing', 
+      'Percentage Missing', 'Source'
+      )
+    ) |>
+  ungroup()
+```
+
+We also created a codebookr codebook.
+
+```{r, message = FALSE, warning = FALSE}
+combined_codebook <- codebook(combined_data,
+         title = 'Combined Data, All Subjects')
+```
+
+## Subset
+
+We did the same for our subset.
+
+```{r}
+subset_table <- tibble::tibble(
+  'var' = colnames(subset_1168)
+  ) |>
+  rowwise() |>
+  mutate(
+  label = attributes(subset_1168[[var]])$label,
+  type = typeof(subset_1168[[var]]),
+  class = case_when(
+    'factor' %in% class(subset_1168[[var]]) ~ 'factor',
+    'numeric' %in% class(subset_1168[[var]]) ~ 'numeric, float',
+    'integer' %in% class(subset_1168[[var]]) ~ 'numeric, integer',
+    'logical' %in% class(subset_1168[[var]]) ~ 'logical'
+    ),
+  source = attributes(subset_1168[[var]])$source,
+  num_missing = sum(is.na(subset_1168[[var]]))
+  ) |>
+  mutate(levels = case_when(
+    class == 'factor' ~ paste0(
+      "'", 
+      paste(levels(subset_1168[[var]]), collapse = "', '"), 
+      "'"),
+    class == 'logical' ~ "'TRUE', 'FALSE'",
+    TRUE ~ NA_character_
+    )
+  ) |>
+  mutate(
+    per_missing = round(num_missing*100/nrow(subset_1168), digits = 4)
+  ) |>
+  relocate(var, num_missing, per_missing, label, type, class, levels, source) |>
+  rename_at(
+    c(
+      'var', 'label', 'type', 'class', 'levels', 'num_missing', 
+      'per_missing', 'source'
+      ), 
+    ~c(
+      'Variable Name', 'Label', 'Type', 'Class', 'Levels', 'Number Missing', 
+      'Percentage Missing', 'Source'
+      )
+    ) |>
+  ungroup()
+```
+
+We also created a codebookr codebook.
+
+```{r}
+subset_codebook <- codebook(subset_1168,
+         title = 'Combined Data, All Subjects')
+```
+
+# 💾 Save the Data
+
+We saved our combined, cleaned data sets into RDS format.
 
 ```{r}
 saveRDS(combined_data, here('data', 'combined_data.rds'))
-saveRDS(subet_1168, here('data', 'subset_1168.rds'))
+saveRDS(subset_1168, here('data', 'subset_1168.rds'))
 ```
+
+We exported our attribute tables to CSV, and codebooks to DOCX
+
+```{r}
+write.csv(combined_table, here('data', 'combined_data_attributes.csv'))
+write.csv(subset_table, here('data', 'subset_included_data_attributes.csv'))
+
+
+# NOTE: issue with codebookr erroneously places title at end, and requires 
+# manual adjustment of DOCX after creation!
+
+print(combined_codebook, here("docs", "Combined Data Codebook.docx"))
+print(subset_codebook, here("docs", "Included Subjects Codebook.docx"))
+```
+
+We removed items that were no longer needed for memory management
 
 ```{r}
 rm(combined_data)
 rm(nhanes_data)
 rm(rx_data)
+rm(subset_1168)
+rm(combined_table)
+rm(subset_table)
+rm(combined_codebook)
+rm(subset_codebook)
+rm(var)
 ```
 
