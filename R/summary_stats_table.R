@@ -1,6 +1,6 @@
 summary_stats_table <- function(
     t_df, cont_mean_cols, cont_median_cols, cat_cols, num_digits = 1, 
-    shade_colors = c('white', '#ededed')){
+    shade_colors = c('white', '#ededed'), docx_path = NA){
 
 # Makes a summary statistics table. To get more comments later
   
@@ -73,8 +73,20 @@ summary_stats_table <- function(
     group_by(var) |> 
     mutate(shade = cur_group_id() %% 2 == 0) |> 
     select(shade, everything()) |> 
-    ungroup() |>
-    DT::datatable(
+    rename_at(
+      c('var', 'cat', 'statistic', 'n', 'formatted_stats'), 
+      ~c(
+        'Variable', 'Category', 'Statistic Type', 'N',
+        'Statistic (95% CI)'
+        )) |>
+    ungroup()
+  
+  ft_table <- flextable::flextable(stats_table |> 
+                                     select(-shade))
+  flextable::save_as_docx(ft_table, path = docx_path)  
+    
+  stats_table <- stats_table |>
+      DT::datatable(
       colnames = c(
         "Shade", "Variable", "Category", "Statistic Type", "N", 
         "Statistic (95% CI)"
