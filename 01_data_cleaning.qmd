@@ -1048,12 +1048,22 @@ We then cleaned the remaining variables for the different insurance types, so th
 ```{r}
 nhanes_data <- nhanes_data |>
   mutate(
-    ins_govt = ifelse(is.na(ins_govt) & !is.na(ins_type), FALSE, ins_govt),
-    ins_private = ifelse(is.na(ins_private) & !is.na(ins_type), 
-                         FALSE, 
-                         ins_private
-                         ),
-    ins_none = ifelse(is.na(ins_none) & ins_type == 'Uninsured', TRUE, ins_none)
+    ins_govt = case_when(
+      ins_type == 'Both private and government' ~ TRUE,
+      ins_type == 'Government' ~ TRUE,
+      !is.na(ins_type) ~ FALSE,
+      TRUE ~ ins_govt
+      ),
+    ins_private = case_when(
+      ins_type == 'Both private and government' ~ TRUE,
+      ins_type == 'Private' ~ TRUE, 
+      !is.na(ins_type) ~ FALSE,
+      TRUE ~ ins_private),
+    ins_none = case_when(
+      ins_type == 'Uninsured' ~ TRUE,
+      !is.na(ins_type) ~ FALSE,
+      TRUE ~ ins_none
+    )
   ) |>
   mutate(ins_dichot = case_when(
     ins_type == 'Uninsured' ~ FALSE,
@@ -1863,7 +1873,7 @@ We also created a codebookr codebook.
 
 ```{r}
 subset_codebook <- codebook(subset_1168,
-         title = 'Combined Data, All Subjects')
+         title = 'Combined Data, Included Subjects')
 ```
 
 # 💾 Save the Data

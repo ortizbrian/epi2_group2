@@ -29,7 +29,7 @@
 "28","ins_any_gap",89,7.6199,"INSURANCE: Time when no insurance in past year?","logical","logical","'TRUE', 'FALSE'","NHANES data set"
 "29","ins_private",95,8.1336,"INSURANCE: Subject reported coverage by private health insurance","logical","logical","'TRUE', 'FALSE'","Significantly modified from NHANES data"
 "30","ins_govt",95,8.1336,"INSURANCE: Subject reported coverage by government health insurance (Medicaire, Medicaid, Medigap, CHIP, State plan, other)","logical","logical","'TRUE', 'FALSE'","Calculated from NHANES data"
-"31","ins_none",1168,100,"INSURANCE: Subject reported they had no health insurance coverage (Uninsured)","logical","logical","'TRUE', 'FALSE'","Significantly modified from NHANES data"
+"31","ins_none",95,8.1336,"INSURANCE: Subject reported they had no health insurance coverage (Uninsured)","logical","logical","'TRUE', 'FALSE'","Significantly modified from NHANES data"
 "32","ins_rx",95,8.1336,"INSURANCE: Do plans cover prescriptions?","logical","logical","'TRUE', 'FALSE'","NHANES data set"
 "33","ins_govt_medicare",595,50.9418,"INSURANCE: Covered by Medicare","logical","logical","'TRUE', 'FALSE'","NHANES data set"
 "34","ins_govt_medigap",1147,98.2021,"INSURANCE: Covered by Medi-Gap","logical","logical","'TRUE', 'FALSE'","NHANES data set"
