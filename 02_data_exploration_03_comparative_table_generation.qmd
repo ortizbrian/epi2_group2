@@ -151,7 +151,6 @@ We generated our comparative statistics table using Mean for Age.
 comparative_stats_table(
   included_data,
   dichot_var = 'adherence',
-  # ID used for mean since no variables are normally distributed in this case.
   cont_mean_cols = c('age'),
   cont_median_cols = c('income_ratio', 'bmi', 'rx_count_total', 
                        'rx_count_lipid'),
@@ -160,3 +159,4 @@ comparative_stats_table(
   docx_path = here('tables', 'Comparative Table - Included Subjects by Adherence - Age Mean.docx')
 )
 ```
+
