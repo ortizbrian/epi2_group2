@@ -1,0 +1,162 @@
+---
+title: "Summary Statistics Tables"
+date: "2022-11-25 <br> Updated: `r Sys.Date()`"
+format: pdf
+editor: 
+  markdown: 
+    wrap: sentence
+---
+
+# ⭐️Overview
+
+This file seeks to generate summary tables.
+
+# 📦 Load packages & Functions
+
+```{r, message=FALSE, warning=FALSE}
+library(here, warn.conflicts = FALSE)
+library(tidyverse, warn.conflicts = FALSE)
+library(mice, warn.conflicts = FALSE)
+```
+
+```{r}
+source(here("R", "comparative_stats_table.R"))
+```
+
+## 📥 Import the Data
+
+We imported our cleaned NHANES data set.
+
+```{r}
+nhanes_path <- here('data', 'combined_data.rds')
+nhanes_data <- readRDS(nhanes_path)
+
+# Print a message for when this file is being sourced
+cat(
+  paste0(Sys.Date(), ":"),
+  "NHANES data imported with", nrow(nhanes_data), "rows and", 
+  ncol(nhanes_data), "columns. \n",
+  "Data last modified: ", as.character(file.info(nhanes_path)$mtime), "\n"
+)
+
+# 2023-11-25: NHANES data imported with 7122 rows and 104 columns. 
+#  Data last modified:  2023-11-25 15:10:57 
+```
+
+We also imported our cleaned subset of included subjects
+
+```{r}
+included_path <- here('data', 'subset_1168.rds')
+included_data <- readRDS(included_path)
+
+# Print a message for when this file is being sourced
+cat(
+  paste0(Sys.Date(), ":"),
+  "Included subject subset data imported with", nrow(included_data), "rows and", 
+  ncol(included_data), "columns. \n",
+  "Data last modified: ", as.character(file.info(included_path)$mtime), "\n"
+)
+
+# 2023-11-25: Included subject subset data imported with 1168 rows and 104 columns. 
+#  Data last modified:  2023-11-25 15:10:57 
+```
+
+# Reverse Ordering of Factors
+
+# Variable Clusters
+
+We identified clusters of variables for our tables.
+
+```{r}
+demographics <- c(
+  'age', 'sex', 'race_ethn_5cat', 'marital_status', 'educ_level', 
+  'income_ratio', 'income_cat'
+  )
+
+insurance_variables <- c('ins_dichot', 'ins_type', 'ins_rx')
+
+health_vars <- c(
+  'bmi', 'bmi_cat', 'alc_heavy', 'smoking_hx', 'cvd_hx', 'cvd_chf_ever', 
+  'cvd_cad_ever', 'cvd_angina_ever', 'cvd_mi_ever', 'cvd_cva_ever'
+  )
+
+rx_vars <- c(
+  'rx_use', 'rx_lipid', 'rx_count_lipid', 'rx_count_total', 'rx_statin', 
+  'rx_pcks9', 'rx_fibrate', 'rx_sequestrant', 'rx_supplement', 'rx_other'
+  )
+
+desired_vars <- c(demographics, insurance_variables, health_vars, rx_vars)
+
+cat_vars <- c(
+  'sex', 'race_ethn_5cat', 'marital_status', 'educ_level', 'income_cat',
+  'bmi_cat', 'alc_heavy', 'smoking_hx', 'cvd_hx', 'cvd_chf_ever', 
+  'cvd_cad_ever', 'cvd_angina_ever', 'cvd_mi_ever', 'cvd_cva_ever',
+  'ins_dichot', 'ins_type', 'ins_rx',
+  'rx_use', 'rx_lipid', 'rx_statin', 'rx_pcks9', 'rx_fibrate', 
+  'rx_sequestrant', 'rx_supplement', 'rx_other'
+  )
+```
+
+# All Subjects
+
+We extracted the desired columns from the complete subject data set
+
+```{r}
+complete_data <- complete_data |>
+  select(all_of(desired_vars), adherence)
+```
+
+We generated our comparative statistics table. 
+
+```{r}
+comparative_stats_table(
+  complete_data,
+  dichot_var = 'adherence',
+  cont_mean_cols = c('age'),
+  cont_median_cols = c('income_ratio', 'bmi', 'rx_count_total', 'rx_count_lipid'),
+  cat_cols = cat_vars,
+  var_order = desired_vars,
+  docx_path = here('tables', 'Comparative Table - All Subjects by Adherence.docx')
+)
+```
+
+# Included Subjects
+
+We extracted the desired columns from the included subject data set
+
+```{r}
+included_data <- included_data |>
+  select(all_of(desired_vars), adherence, id)
+```
+
+We generated our comparative statistics table using Median for Age.
+
+```{r}
+comparative_stats_table(
+  included_data,
+  dichot_var = 'adherence',
+  # ID used for mean since no variables are normally distributed in this case.
+  cont_mean_cols = c('id'),
+  cont_median_cols = c('age', 'income_ratio', 'bmi', 'rx_count_total', 
+                       'rx_count_lipid'),
+  cat_cols = cat_vars,
+  var_order = desired_vars,
+  docx_path = here('tables', 'Comparative Table - Included Subjects by Adherence - Age Median.docx')
+)
+```
+
+We generated our comparative statistics table using Mean for Age.
+
+```{r}
+comparative_stats_table(
+  included_data,
+  dichot_var = 'adherence',
+  # ID used for mean since no variables are normally distributed in this case.
+  cont_mean_cols = c('age'),
+  cont_median_cols = c('income_ratio', 'bmi', 'rx_count_total', 
+                       'rx_count_lipid'),
+  cat_cols = cat_vars,
+  var_order = desired_vars,
+  docx_path = here('tables', 'Comparative Table - Included Subjects by Adherence - Age Mean.docx')
+)
+```
