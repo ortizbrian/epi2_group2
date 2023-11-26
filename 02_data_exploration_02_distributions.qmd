@@ -11,10 +11,6 @@ editor:
 
 This file seeks to perform initial exploration of the NHANES data, focused on the distribution of variables
 
-## 🕒 Change Log
-
-**2023-11-08**, file initialized
-
 # 📦 Load packages & Functions
 
 ```{r, message=FALSE, warning=FALSE}
@@ -43,8 +39,26 @@ cat(
   "Data last modified: ", as.character(file.info(nhanes_path)$mtime), "\n"
 )
 
-# 2023-11-09: NHANES data imported with 7122 rows and 105 columns. 
-#  Data last modified:  2023-11-09 12:00:16 
+# 2023-11-25: NHANES data imported with 7122 rows and 104 columns. 
+#  Data last modified:  2023-11-25 15:10:57 
+```
+
+We also imported our cleaned subset of included subjects
+
+```{r}
+included_path <- here('data', 'subset_1168.rds')
+included_data <- readRDS(included_path)
+
+# Print a message for when this file is being sourced
+cat(
+  paste0(Sys.Date(), ":"),
+  "Included subject subset data imported with", nrow(included_data), "rows and", 
+  ncol(included_data), "columns. \n",
+  "Data last modified: ", as.character(file.info(included_path)$mtime), "\n"
+)
+
+# 2023-11-25: Included subject subset data imported with 1168 rows and 104 columns. 
+#  Data last modified:  2023-11-25 15:10:57 
 ```
 
 # All Subjects
@@ -374,20 +388,20 @@ The number of moderate activity minutes per week occuring in recreation for a su
 Histogram with a unimodal peak with significant right skew.
 
 ```{r}
-hist(nhanes_data$active_mod_rec)
+hist(nhanes_data$active_mod_rec_dur)
 ```
 
 Boxplot demonstrating significant right skew, with many outliers to the far positive ranges of values
 
 ```{r}
-boxplot(nhanes_data$active_mod_rec)
+boxplot(nhanes_data$active_mod_rec_dur)
 ```
 
 QQ demonstrating significant deviation in the far positive range of values.
 
 ```{r}
-qqnorm(nhanes_data$active_mod_rec)
-qqline(nhanes_data$active_mod_rec)
+qqnorm(nhanes_data$active_mod_rec_dur)
+qqline(nhanes_data$active_mod_rec_dur)
 ```
 
 ### Total Number of Vigorous Active Minutes per Week
@@ -461,9 +475,18 @@ summary_stats_table(
       'active_total'
       )
     ),
-  num_digits = 1
+  num_digits = 1,
+  docx_path = here(
+    'tables', 
+    'Summary Stats - All Subjects - All Variables.docx'
+    )
   )
 ```
+
+```{r}
+
+```
+
 
 # Included Subjects Only
 
@@ -792,20 +815,20 @@ The number of moderate activity minutes per week occuring in recreation for a su
 Histogram with a unimodal peak with significant right skew.
 
 ```{r}
-hist(included_data$active_mod_rec)
+hist(included_data$active_mod_rec_dur)
 ```
 
 Boxplot demonstrating significant right skew, with many outliers to the far positive ranges of values
 
 ```{r}
-boxplot(included_data$active_mod_rec)
+boxplot(included_data$active_mod_rec_dur)
 ```
 
 QQ demonstrating significant deviation in the far positive range of values.
 
 ```{r}
-qqnorm(included_data$active_mod_rec)
-qqline(included_data$active_mod_rec)
+qqnorm(included_data$active_mod_rec_dur)
+qqline(included_data$active_mod_rec_dur)
 ```
 
 ### Total Number of Vigorous Active Minutes per Week
@@ -876,10 +899,15 @@ summary_stats_table(
       'income_ratio', 'cvd_chf_age', 'cvd_cad_age', 'cvd_cva_age',
       'bmi', 'alc_per_day', 'rx_count_total', 'active_mod_work_dur',
       'active_transport_dur', 'active_mod_rec_dur', 'active_vig_dur',
-      'active_total'
+      'active_total', 
+      'ins_govt_chip' #All values missing
       )
     ),
-  num_digits = 1
+  num_digits = 1,
+  docx_path = here(
+    'tables', 
+    'Summary Stats - Included Subjects - All Variables.docx'
+    )
   )
 ```
 

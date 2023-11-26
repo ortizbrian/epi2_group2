@@ -8,7 +8,11 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 require("knitr")
-opts_knit$set(root.dir = "/Users/michaelyan/Dropbox/Mac/Desktop/UTH/Fall 2023/Epi 3/Group Project/epi3_group2/data")
+# 🔴 Michael - this line makes the file very specific to your system.
+# I try to use 'here' to navigate from the project root for this reason.
+#opts_knit$set(root.dir = "/Users/michaelyan/Dropbox/Mac/Desktop/UTH/Fall 2023/Epi 3/Group #Project/epi3_group2/data")
+
+opts_knit$set(root.dir = here::here('data'))
 ```
 
 ```{r, message=FALSE}
