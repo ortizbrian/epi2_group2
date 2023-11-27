@@ -49,6 +49,15 @@ chisq_race <- chisq.test(table(subset_1168_data$adherence, subset_1168_data$race
 # Chi-squared test for medication adherence and sex
 chisq_gender <- chisq.test(table(subset_1168_data$adherence, subset_1168_data$sex))
 
+# Chi-squared test for medication adherence and marital status
+chisq_marital <- chisq.test(table(subset_1168_data$adherence, subset_1168_data$marital_status))
+
+# Chi-squared test for medication adherence and alcohol use
+chisq_alcohol <- chisq.test(table(subset_1168_data$adherence, subset_1168_data$alc_heavy))
+
+# Chi-squared test for medication adherence and tobacco use
+chisq_tobacco <- chisq.test(table(subset_1168_data$adherence, subset_1168_data$smoking_hx))
+
 # T-test for medication adherence and age
 t_test_age <- t.test(subset_1168_data$age ~ subset_1168_data$adherence)
 
@@ -57,10 +66,13 @@ print(chisq_income)
 print(chisq_insurance)
 print(chisq_race)
 print(chisq_gender)
+print(chisq_marital)
+print(chisq_alcohol)
+print(chisq_tobacco)
 print(t_test_age)
 ```
 
-The results from the bivariate analyses provide valuable insights into the relationships between adherence to prescribed cholesterol medication and various factors such as family income, health insurance status, race/ethnicity, gender, and age. 
+The results from the bivariate analyses provide valuable insights into the relationships between adherence to prescribed cholesterol medication and various factors such as family income, health insurance status, race/ethnicity, gender, marital status, alcohol use, tobacco use, and age. 
 
 1. Family Income vs. Adherence:
 Chi-squared test result: 
@@ -82,14 +94,30 @@ Chi-squared test result:
 $$X^2=4.1148, df=1, p-value=0.04251$$
 Interpretation: There is a statistically significant association between gender and medication adherence, with the p-value indicating that these differences are unlikely to be due to random chance.
 
-5. Age vs. Adherence:
+5. Marital Status vs. Adherence:
+Chi-squared test result: 
+$$X^2=14.11, df=2, p-value=0.0008633$$
+Interpretation: This suggests that marital status is an important factor in adherence.
+
+6. Alcohol Use vs. Adherence:
+Chi-squared test result: 
+$$X^2=3.7807, df=1, p-value=0.05185$$
+Interpretation: The association between heavy alcohol use and medication adherence is on the borderline of statistical significance, indicating a potential relationship that may require further exploration.
+
+7. Tobacco use vs. Adherence:
+Chi-squared test result: 
+$$X^2=14.247, df=2, p-value=0.0008058$$
+Interpretation: The association between heavy alcohol use and medication adherence is on the borderline of statistical significance, indicating a potential relationship that may require further exploration.
+
+8. Age vs. Adherence:
 T-test result:
 $$t=-8.921, df=692.18, p-value=2.2 \times 10^{-16}$$
-Interpretation: There is a highly significant difference in the mean ages of participants who adhere to medication and those who do not, with the negative t-value indicating that the mean age is lower in the group that is non-adherent. The extremely low p-value strongly suggests that this difference is not due to chance.
+Interpretation: There is a significant association between tobacco use and medication adherence, suggesting that smoking status is an important factor.
 
 Note on the Warning: The warning regarding the Chi-squared approximation may be due to small expected frequencies in some cells of the contingency tables. This is common when some categories have a low number of observations. In such cases, alternative tests like Fisher's Exact Test for small sample sizes might be more appropriate, especially for the race and gender analyses.
 
-Overall, these analyses provide evidence that factors like family income, insurance status, gender, and age are significantly associated with medication adherence in our study population. The lack of significance in the race analysis might warrant further investigation or a different analytical approach.
+### Bivariate Analysis Interpretation
+The bivariate analysis results highlight the multifaceted nature of factors influencing medication adherence. Income, insurance status, marital status, tobacco use, and age appear to have significant associations with adherence, while race and alcohol use show potential trends that might be worth further investigation. It's important to consider these factors in the context of our research questions and the limitations of bivariate analyses. Moving forward, incorporating these variables into a multivariate model will help in understanding the combined effects and interactions among these factors.
 
 ## Bivariate Analysis Visualization
 ```{r}
@@ -148,7 +176,40 @@ ggplot(subset_1168_data, aes(x = sex, fill = adherence_factor)) +
   coord_flip() +
   theme(legend.title = element_blank())
 
-# Age vs Adherence Box Plot (does not use coord_flip())
+# Marital Status vs Adherence
+ggplot(subset_1168_data, aes(x = marital_status, fill = adherence_factor)) +
+  geom_bar() +
+  scale_fill_manual(values = new_colors) +
+  labs(title = "Adherence to Cholesterol Medication by Marital Status",
+       y = "Count",
+       x = "Marital Status") +
+  theme_minimal() +
+  coord_flip() +
+  theme(legend.title = element_blank())
+
+# Alcohol Use vs Adherence
+ggplot(subset_1168_data, aes(x = alc_heavy, fill = adherence_factor)) +
+  geom_bar() +
+  scale_fill_manual(values = new_colors) +
+  labs(title = "Adherence to Cholesterol Medication by Alcohol Use",
+       y = "Count",
+       x = "Alcohol Use") +
+  theme_minimal() +
+  coord_flip() +
+  theme(legend.title = element_blank())
+
+# Tobacco Use vs Adherence
+ggplot(subset_1168_data, aes(x = smoking_hx, fill = adherence_factor)) +
+  geom_bar() +
+  scale_fill_manual(values = new_colors) +
+  labs(title = "Adherence to Cholesterol Medication by Tobacco Use",
+       y = "Count",
+       x = "Tobacco Use") +
+  theme_minimal() +
+  coord_flip() +
+  theme(legend.title = element_blank())
+
+# Age vs Adherence Box Plot
 ggplot(subset_1168_data, aes(x = adherence_factor, y = age, fill = adherence_factor)) +
   geom_boxplot() +
   scale_fill_manual(values = new_colors) +
@@ -172,14 +233,23 @@ The distribution across race/ethnicity groups shows that Non-Hispanic White indi
 4. Adherence to Cholesterol Medication by Gender:
 The chart indicates that males have a slightly higher count of non-adherence than females. The chi-squared test for gender was significant, suggesting a potential difference in adherence behavior between genders.
 
-5. Age Distribution by Cholesterol Medication Adherence:
+5. Adherence to Cholesterol Medication by Marital Status: The visualization suggests that marital status may play a role in adherence to cholesterol medication. Individuals who are married or living with a partner show a higher adherence rate compared to those who have never been married or are widowed/divorced/separated. This is consistent with the chi-squared test indicating a significant association between marital status and medication adherence.
+
+6. Adherence to Cholesterol Medication by Alcohol Use: The bar chart suggests that heavy alcohol users have a slightly lower adherence to cholesterol medication than those who do not engage in heavy drinking, as indicated by the larger proportion of non-adherence in the 'TRUE' category for heavy drinking. However, this association is not statistically significant at the 0.05 level, with a p-value just above the threshold.
+
+7. Adherence to Cholesterol Medication by Tobacco Use: The chart illustrates adherence to cholesterol medication among different categories of tobacco users. Individuals who have never smoked show a higher proportion of adherence to medication, followed closely by past smokers, while current smokers have the lowest proportion of adherence. The chi-squared test result supports a significant association between tobacco use and medication adherence.
+
+8. Age Distribution by Cholesterol Medication Adherence:
 The box plot shows a clear difference in the age distribution between those who adhere and those who do not, with the median age of adherent individuals being higher. This is consistent with the t-test results, which indicated a significant difference in age between the two groups.
 
-These visualizations effectively communicate the relationships and trends that we have identified through our chi-squared and t-tests. They serve as a powerful tool for understanding the data at a glance and for presenting our findings to others.
+### Bivariate Analysis Visualization Interpretation
+These visualizations communicate the relationships and trends identified through our chi-squared and t-tests, encompassing socioeconomic factors, insurance coverage, demographic characteristics, and personal behaviors like marital status, alcohol, and tobacco use. They are crucial for quickly grasping the data's complexity and effectively disseminating our findings.
 
-These visualizations highlight critical associations between socioeconomic factors, insurance coverage, demographic characteristics, and medication adherence. They serve as an essential complement to the statistical analyses, providing a clear and interpretable depiction of the data that can guide targeted interventions and policy-making to improve adherence rates and reduce health disparities.
+The visualizations bring to light the significant connections between a wide array of factors and medication adherence. Including marital status, alcohol, and tobacco use, they offer a more intricate picture of the data, which is instrumental in guiding interventions and policy decisions aimed at bolstering adherence rates and mitigating health disparities.
 
-Based on the bivariate analysis results, several trends and relationships emerge in the context of adherence to cholesterol medication. Age stands out as a significant factor, with older individuals showing a higher likelihood of medication adherence. This pattern indicates a potential increase in health awareness or medication compliance with age. The analysis also suggests a possible association between adherence and gender, albeit less pronounced than age, indicating potential behavioral differences in medication compliance between males and females. While income, insurance status, and race/ethnicity were explored, their relationships with adherence in the bivariate analysis were not consistently significant, suggesting that these factors' influence on adherence may be more complex and possibly intertwined with other variables. The bivariate analysis provides an initial understanding of the factors influencing medication adherence but also highlights the need for more nuanced multivariate analyses to unravel the interplay between these various demographic and socioeconomic factors.
+The bivariate analysis illuminates several noteworthy trends. It suggests that marital status is a significant factor, with married individuals or those with partners showing a higher propensity for medication adherence, perhaps due to the support system a partner can provide. Tobacco use also emerges as a relevant factor; individuals who have never smoked display greater adherence, which may reflect broader health-conscious behavior. While the association with heavy alcohol use is not statistically significant, the observed pattern warrants further investigation. Together, these factors underscore the complexity of medication adherence and the importance of a multifaceted analytical approach that considers demographic, socioeconomic, and behavioral influences. The subsequent multivariate analysis will be vital to unpack the intertwined effects of these variables on adherence to cholesterol medication.
+
+
 
 ## Multivariate Analysis
 Next, we'll conduct a logistic regression analysis to assess the relationship between family income and medication adherence, controlling for confounders.
