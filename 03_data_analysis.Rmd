@@ -8,10 +8,6 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 require("knitr")
-# 🔴 Michael - this line makes the file very specific to your system.
-# I try to use 'here' to navigate from the project root for this reason.
-#opts_knit$set(root.dir = "/Users/michaelyan/Dropbox/Mac/Desktop/UTH/Fall 2023/Epi 3/Group #Project/epi3_group2/data")
-
 opts_knit$set(root.dir = here::here('data'))
 ```
 
@@ -23,11 +19,9 @@ library(expss)
 set.seed(1028)
 ```
 
-# Epi 3 Data Analysis Section 1
+# Epi 3 Data Analysis
 
-## This section ignores the inclusion/exclusion criteria and uses all 7122 subjects (using complete_data)
-
-### Import data
+## Import data
 ```{r}
 # Import the dataset
 complete_data<-readRDS("combined_data.rds")
@@ -38,254 +32,9 @@ subset_1168_data<-readRDS("subset_1168.rds")
 #write_labelled_csv(subset_1168_data, "subset_1168_data_labeled.csv", row.names=FALSE)
 ```
 
-### Bivariate Analysis
-In bivariate analysis, we'll use Chi-squared tests for categorical variables like health insurance status, race/ethnicity, gender, and a T-test for continuous variables like age.
-```{r}
-# Chi-squared test for medication adherence and family income
-chisq_income <- chisq.test(table(complete_data$adherence, complete_data$income_cat))
+This analysis follows the inclusion/exclusion criteria and uses a subset of 1168 subjects (using subset_1168_data)
 
-# Chi-squared test for medication adherence and total insurance status
-chisq_insurance <- chisq.test(table(complete_data$adherence, complete_data$ins_classif))
-
-# Chi-squared test for medication adherence and race
-chisq_race <- chisq.test(table(complete_data$adherence, complete_data$race_6cat))
-
-# Chi-squared test for medication adherence and sex
-chisq_gender <- chisq.test(table(complete_data$adherence, complete_data$sex))
-
-# T-test for medication adherence and age
-t_test_age <- t.test(complete_data$age ~ complete_data$adherence)
-
-# Print the results
-print(chisq_income)
-print(chisq_insurance)
-print(chisq_race)
-print(chisq_gender)
-print(t_test_age)
-```
-
-The results from the bivariate analyses provide valuable insights into the relationships between adherence to prescribed cholesterol medication and various factors such as family income, health insurance status, race/ethnicity, gender, and age. 
-
-1. Family Income vs. Adherence:
-Chi-squared test result: 
-$$X^2=8.3414, df=2, p-value=0.01544$$
-Interpretation: There is a statistically significant association between family income category and adherence to cholesterol medication. Since the p-value is less than 0.05, we can conclude that the differences in adherence rates across different income categories are not due to random chance.
-
-2. Health Insurance Status vs. Adherence:
-Chi-squared test result: 
-$$X^2=54.283, df=8, p-value=6.085 \times 10^{-9}$$
-Interpretation: There is a highly statistically significant association between health insurance classification and medication adherence. The extremely low p-value indicates strong evidence against the null hypothesis of no association.
-
-3. Race/Ethnicity vs. Adherence:
-Chi-squared test result: 
-$$X^2=15.478, df=5, p-value=0.008503$$
-Interpretation: Race/ethnicity shows a statistically significant association with medication adherence. The p-value below 0.05 suggests that different racial/ethnic groups have different adherence rates to cholesterol medication.
-
-4. Gender vs. Adherence:
-Chi-squared test result: 
-$$X^2=2.4827, df=1, p-value=0.1151$$
-Interpretation: There is no statistically significant association between gender and medication adherence. The p-value is greater than 0.05, indicating that any observed differences in adherence between genders could be due to chance.
-
-5. Age vs. Adherence:
-T-test result:
-$$t=-11.074, df=901.08, p-value=2.2 \times 10^{-16}$$
-Interpretation: There is a highly statistically significant difference in the average age between those who adhere to their medication and those who do not. The negative t-value indicates that the mean age of the group adhering to the medication (mean = 64.84 years) is higher than that of the non-adhering group (mean = 56.91 years). The extremely low p-value provides strong evidence against the null hypothesis of no difference in means.
-
-These results suggest that socioeconomic factors (like income and insurance status), as well as demographic characteristics (like race/ethnicity and age), are associated with adherence to cholesterol medication. Gender, however, does not seem to show a significant association in this context. These findings can inform further multivariate analysis to understand the independent effect of each factor while controlling for others.
-
-### Bivariate Analysis Visualization
-```{r}
-# Ensure NA is a factor level and label it as "No Response"
-complete_data$adherence_factor <- factor(complete_data$adherence, levels = c(FALSE, TRUE))
-complete_data$adherence_factor <- addNA(complete_data$adherence_factor)
-levels(complete_data$adherence_factor)[is.na(levels(complete_data$adherence_factor))] <- "No Response"
-
-# Define new colors for the bars, including NA
-new_colors <- c("TRUE" = "#1b9e77", "FALSE" = "#d95f02", "No Response" = "#4D4D4D")
-
-# Create the plots, making sure to use scale_fill_manual to include NA values
-# and set the axis titles correctly after coord_flip()
-
-# Income Category vs Adherence
-ggplot(complete_data, aes(x = income_cat, fill = adherence_factor)) +
-  geom_bar() +
-  scale_fill_manual(values = new_colors) +
-  labs(title = "Adherence to Cholesterol Medication by Income Category",
-       y = "Count",
-       x = "Income Category") +
-  theme_minimal() +
-  coord_flip() +
-  theme(legend.title = element_blank())
-
-# Health Insurance Classification vs Adherence
-ggplot(complete_data, aes(x = ins_classif, fill = adherence_factor)) +
-  geom_bar() +
-  scale_fill_manual(values = new_colors) +
-  labs(title = "Adherence to Cholesterol Medication by Health Insurance Status",
-       y = "Count",
-       x = "Health Insurance Classification") +
-  theme_minimal() +
-  coord_flip() +
-  theme(legend.title = element_blank())
-
-# Race/Ethnicity vs Adherence
-ggplot(complete_data, aes(x = race_6cat, fill = adherence_factor)) +
-  geom_bar() +
-  scale_fill_manual(values = new_colors) +
-  labs(title = "Adherence to Cholesterol Medication by Race/Ethnicity",
-       y = "Count",
-       x = "Race/Ethnicity") +
-  theme_minimal() +
-  coord_flip() +
-  theme(legend.title = element_blank())
-
-# Gender vs Adherence
-ggplot(complete_data, aes(x = sex, fill = adherence_factor)) +
-  geom_bar() +
-  scale_fill_manual(values = new_colors) +
-  labs(title = "Adherence to Cholesterol Medication by Gender",
-       y = "Count",
-       x = "Gender") +
-  theme_minimal() +
-  coord_flip() +
-  theme(legend.title = element_blank())
-
-# Age vs Adherence Box Plot (does not use coord_flip())
-ggplot(complete_data, aes(x = adherence_factor, y = age, fill = adherence_factor)) +
-  geom_boxplot() +
-  scale_fill_manual(values = new_colors) +
-  labs(title = "Age Distribution by Cholesterol Medication Adherence",
-       x = "Adherence to Medication",
-       y = "Age") +
-  theme_minimal() +
-  theme(legend.title = element_blank())
-```
-
-The resulting plots reveal several patterns related to adherence to cholesterol medication among adults:
-
-1. Adherence by Income Category: The first bar chart suggests that individuals with higher income (greater than 185% FPL - Federal Poverty Level) show the highest adherence to cholesterol medication. This may indicate that financial stability plays a crucial role in the ability to maintain prescribed medication regimens. The "No Response" category could reflect missing data or respondents who did not answer the adherence question, highlighting the need to address potential barriers in data collection or survey response.
-
-2. Adherence by Health Insurance Status: The second bar chart shows that individuals with both private and government insurance, especially with drug coverage, have higher adherence levels. This reinforces the importance of comprehensive health insurance in supporting medication adherence. The presence of "No Response" in this category similarly underscores the potential for missing data or non-responses that could influence the study's findings.
-
-3. Adherence by Race/Ethnicity: The third bar chart indicates variability in adherence among different racial and ethnic groups. Notably, the "Non-Hispanic White" group exhibits a higher adherence compared to other groups. Such disparities may point to underlying social, economic, or cultural factors that affect health behaviors.
-
-4. Adherence by Gender: The fourth bar chart illustrates that female respondents exhibit slightly higher adherence to cholesterol medication than male respondents, which could suggest gender-specific factors influencing health behavior, though the difference is not huge.
-
-5. Age Distribution by Adherence: The box plot shows the age distribution for each adherence group. Individuals who are adherent to their cholesterol medication appear to be older on average than those who are non-adherent. This could be due to older adults having more established routines, a greater prevalence of chronic conditions necessitating adherence, or a higher likelihood of experiencing the consequences of non-adherence. The "No Response" group does not provide a clear age distribution due to the nature of missing data.
-
-These visualizations highlight critical associations between socioeconomic factors, insurance coverage, demographic characteristics, and medication adherence. They serve as an essential complement to the statistical analyses, providing a clear and interpretable depiction of the data that can guide targeted interventions and policy-making to improve adherence rates and reduce health disparities.
-
-### Multivariate Analysis
-Next, we'll conduct a logistic regression analysis to assess the relationship between family income and medication adherence, controlling for confounders.
-```{r}
-# Logistic regression model
-lr_model <- glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level, 
-             family = binomial(link = "logit"), 
-             data = complete_data)
-
-# Summary of the model
-summary(lr_model)
-```
-
-The output from the logistic regression model provides several pieces of information that can be interpreted to understand the factors associated with adherence to cholesterol medication:
-
-1. Income Category (income_cat.L): The linear term for income category is significant (p = 0.0263), suggesting that as income increases, the log-odds of being adherent to cholesterol medication also increase. The positive coefficient (log-odds) (Estimate = 0.276106) indicates a positive relationship between higher income levels and adherence.
-
-2. Health Insurance Classification (ins_classif): None of the terms for health insurance classification are statistically significant, as all p-values are well above the conventional alpha level of 0.05. This suggests that within this model, health insurance classification is not a significant predictor of medication adherence when controlling for other factors.
-
-3. Race/Ethnicity (race_6cat): The terms for race/ethnicity are not statistically significant, with p-values greater than 0.05. However, the quadratic term (race_6cat.Q) approaches significance (p = 0.0747), indicating there might be a complex relationship between race/ethnicity and medication adherence that warrants further investigation.
-
-4. Gender (sex.L): Gender is not a significant predictor of medication adherence in this model (p = 0.9425), indicating that the difference between males and females is not statistically significant when other factors are controlled for.
-
-5. Age: Age is a highly significant predictor (p < 0.001), with a positive coefficient (Estimate = 0.035953). This indicates that for each additional year of age, the log-odds of being adherent to cholesterol medication increase, suggesting that older individuals are more likely to adhere to their medication.
-
-6. Education Level (educ_level): The education level terms are not significant predictors of medication adherence, with all p-values above 0.05, indicating no clear association between education level and adherence within this model.
-
-7. Model Fit: The difference between the null deviance and the residual deviance indicates that the model with predictors fits the data better than a model without any predictors. However, given the relatively small decrease, there may still be room for model improvement.
-
-8. AIC: The Akaike Information Criterion (AIC) for the model is 1443.1. This metric helps compare different models, with lower values indicating a better fit to the data.
-
-9. Missingness: A large number of observations were deleted due to missingness (5918 observations), which could significantly affect the results. It's important to investigate the missing data pattern to ensure that it is not biasing the results.
-
-Overall, income and age seem to be significant factors associated with adherence to cholesterol medication in this multivariate context. The significance of income suggests a possible socioeconomic gradient in medication adherence. The relationship with age could reflect better health habits or more regular healthcare usage among older individuals. It is crucial to consider the context of these results and the potential impact of missing data on the study's findings. Further analysis might involve exploring interactions between variables, considering non-linear relationships, and addressing the issue of missing data, possibly through imputation methods or sensitivity analyses.
-
-```{r}
-# Calculate Odds Ratios and 95% Confidence Intervals
-or <- exp(coef(lr_model))
-# Wald Confidence Intervals and p-values
-se <- sqrt(diag(vcov(lr_model)))
-wald_ci_lower <- exp(coef(lr_model) - 1.96 * se)
-wald_ci_upper <- exp(coef(lr_model) + 1.96 * se)
-p_values <- summary(lr_model)$coefficients[, "Pr(>|z|)"]
-
-# Create a data frame to nicely format the results
-results <- data.frame(
-  OR = exp(coef(lr_model)),
-  LowerCI = wald_ci_lower,
-  UpperCI = wald_ci_upper,
-  PValue = p_values
-)
-
-# View the results
-print(results)
-```
-
-```{r}
-####### Uncomment this chunk to generate the multivariate results table #######
-# # Load the required packages
-# library(knitr)
-# library(kableExtra)
-# 
-# # Create a nice looking table to present the above ORs, CIs, and p-values
-# nice_table <- kable(results, 
-#                     format = "latex",  # Use "latex" for PDF output or "pipe" for Markdown or "html" for HTML
-#                     digits = 3,       # Number of decimal places
-#                     align = 'c',      # Center align the columns
-#                     caption = "Multivariate Analysis of Factors Associated with Adherence to Cholesterol Medication") %>%
-#   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
-#                 full_width = F, 
-#                 position = "center") %>%
-#   column_spec(1, bold = T) %>%         # Make the OR column bold
-#   column_spec(2:4, color = "blue") %>% # Color the CI columns blue
-#   scroll_box(width = "100%", height = "2000px") # Add a scroll box if the table is too large
-# 
-# # Print the table
-# nice_table
-# 
-# # To display this table outside of an R Markdown document, save it to an HTML file and open it in a web browser
-# save_kable(nice_table, file = "Multivariate_Results_Table_complete.html")
-```
-
-The table summarizes the results of a multivariate logistic regression analysis that examined the factors associated with adherence to cholesterol medication.
-
-1. Income Category (income_cat.L): The linear term for income category is statistically significant (p = 0.026) with an odds ratio (OR) of 1.318. This suggests that as income increases, the odds of adhering to cholesterol medication also increase, controlling for other factors in the model. The confidence interval (CI) does not include 1 (CI: 1.033 to 1.682), supporting this finding.
-
-2. Health Insurance Classification (ins_classif): None of the health insurance classification coefficients are statistically significant, as indicated by the p-values greater than 0.05. This suggests that, when controlling for other factors, health insurance classification may not independently influence adherence to cholesterol medication. However, the extremely large confidence intervals and the presence of zeroes and infinities suggest issues with the model, such as non-convergence or complete separation.
-
-3. Race/Ethnicity (race_6cat): None of the coefficients for race/ethnicity are statistically significant, though the quadratic term (race_6cat.Q) is borderline (p = 0.075) with an OR of 1.558. This might suggest a more complex relationship between race/ethnicity and medication adherence that could warrant further investigation. However, the findings do not provide strong evidence of an association within this model.
-
-4. Gender (sex.L): Gender is not a statistically significant predictor of medication adherence (p = 0.942) with an OR close to 1 (OR = 1.007). This suggests that, when controlling for other variables, gender differences do not significantly impact adherence.
-
-5. Age: Age is a highly significant predictor (p < 0.001) with an OR of 1.037. This indicates that with each additional year of age, the odds of being adherent to cholesterol medication increase slightly, suggesting that older adults are more likely to be adherent.
-
-6. Education Level (educ_level): Education level is not a significant predictor of medication adherence, as all p-values are well above 0.05. This indicates no clear association between educational attainment and adherence within this model.
-
-The extremely large and infinite CIs for some of the insurance classification coefficients are concerning and suggest that the model may not be specified correctly or that there are data issues such as perfect prediction or quasi-complete separation. The large CIs and the p-values close to 1 are unusual and warrant further investigation into the model's fit and the data's quality. These anomalies could be a result of rare categories, outliers, or collinearity within the predictors.
-
-Given these results, the significant predictors in this model are income level and age, while other factors like education level, gender, and race/ethnicity are not statistically significant in predicting adherence to cholesterol medication. The model's anomalies should be addressed before drawing firm conclusions from this analysis.
-
-
-
-
-
-
-
-
-# Epi 3 Data Analysis Section 2
-
-## This section follows the inclusion/exclusion criteria and uses a subset of 1168 subjects (using subset_1168_data)
-
-### Bivariate Analysis
+## Bivariate Analysis
 In bivariate analysis, we'll use Chi-squared tests for categorical variables like health insurance status, race/ethnicity, gender, and a T-test for continuous variables like age.
 ```{r}
 # Chi-squared test for medication adherence and family income
@@ -342,7 +91,7 @@ Note on the Warning: The warning regarding the Chi-squared approximation may be 
 
 Overall, these analyses provide evidence that factors like family income, insurance status, gender, and age are significantly associated with medication adherence in our study population. The lack of significance in the race analysis might warrant further investigation or a different analytical approach.
 
-### Bivariate Analysis Visualization
+## Bivariate Analysis Visualization
 ```{r}
 # Ensure NA is a factor level and label it as "No Response"
 subset_1168_data$adherence_factor <- factor(subset_1168_data$adherence, levels = c(FALSE, TRUE))
@@ -432,7 +181,7 @@ These visualizations highlight critical associations between socioeconomic facto
 
 Based on the bivariate analysis results, several trends and relationships emerge in the context of adherence to cholesterol medication. Age stands out as a significant factor, with older individuals showing a higher likelihood of medication adherence. This pattern indicates a potential increase in health awareness or medication compliance with age. The analysis also suggests a possible association between adherence and gender, albeit less pronounced than age, indicating potential behavioral differences in medication compliance between males and females. While income, insurance status, and race/ethnicity were explored, their relationships with adherence in the bivariate analysis were not consistently significant, suggesting that these factors' influence on adherence may be more complex and possibly intertwined with other variables. The bivariate analysis provides an initial understanding of the factors influencing medication adherence but also highlights the need for more nuanced multivariate analyses to unravel the interplay between these various demographic and socioeconomic factors.
 
-### Multivariate Analysis
+## Multivariate Analysis
 Next, we'll conduct a logistic regression analysis to assess the relationship between family income and medication adherence, controlling for confounders.
 ```{r}
 # Logistic regression model
@@ -535,7 +284,7 @@ The table contains odds ratios (OR), confidence intervals (CI), and p-values for
 
 In summary, the only factor that shows a significant association with medication adherence in this model is age, with older individuals being more likely to adhere to their cholesterol medication regimen. The other factors do not show a statistically significant relationship with adherence in this model. It's important to note the potential issues with the insurance classification variable, which may require further investigation or an alternative modeling approach.
 
-### Multivariate Analysis Visualization
+## Multivariate Analysis Visualization
 ```{r}
 # First, we need to extract the model coefficients and their confidence intervals
 model_coef <- coef(summary(lr_model))
@@ -569,7 +318,7 @@ This plot is not informative as some ORs are really large and some CIs are reall
 
 The multivariate analysis of factors influencing adherence to cholesterol medication yields insightful findings. Age consistently emerges as a significant predictor across various models, reinforcing the trend that older individuals are more likely to adhere to their medication regimen. This finding suggests a greater health consciousness or prioritization of medication adherence with increasing age. Income's relationship with adherence presents a more complex picture; it appears significant in some stratified analyses, indicating that financial status may play a role in adherence, though the nature of this relationship is not straightforward and varies across different demographic groups. Gender, race/ethnicity, and insurance status, while included in the models, do not consistently show a significant independent impact on adherence, suggesting that these factors' influence might be more nuanced or overshadowed by other variables like age. The multivariate analysis underscores the complexity of medication adherence behavior, highlighting that it is influenced by a combination of demographic and socioeconomic factors, with age being the most prominent predictor in this study.
 
-### Stratified Analyses
+## Stratified Analyses
 ```{r}
 # Stratified analysis by race/ethnicity
 stratified_by_race <- subset_1168_data %>%
