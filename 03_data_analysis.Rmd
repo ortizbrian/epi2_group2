@@ -422,15 +422,13 @@ print(lr_plot)
 
 This plot is not informative as some ORs are really large and some CIs are really wide. 
 
-
-
 ## Stratified Analyses
 ```{r warning = FALSE}
 # Stratified analysis by income level
 stratified_by_income <- subset_1168_data %>%
   split(.$income_cat) %>%
   lapply(function(data) {
-    glm(adherence ~ ins_classif + race_6cat + sex + age + educ_level + marital_status + alc_heavy + smoking_hx, 
+    glm(adherence ~ ins_classif + race_6cat + sex + age + educ_level + marital_status + alc_heavy + smoking_hx + bmi_cat + cvd_hx + alc_heavy + bmi_cat, 
         family = binomial(link = "logit"), 
         data = data)
   })
@@ -439,7 +437,7 @@ stratified_by_income <- subset_1168_data %>%
 stratified_by_race <- subset_1168_data %>%
   split(.$race_6cat) %>%
   lapply(function(data) {
-    glm(adherence ~ income_cat + ins_classif + sex + age + educ_level + marital_status + alc_heavy + smoking_hx, 
+    glm(adherence ~ income_cat + ins_classif + sex + age + educ_level + marital_status + alc_heavy + smoking_hx + alc_heavy + bmi_cat, 
         family = binomial(link = "logit"), 
         data = data)
   })
@@ -448,7 +446,7 @@ stratified_by_race <- subset_1168_data %>%
 stratified_by_gender <- subset_1168_data %>%
   split(.$sex) %>%
   lapply(function(data) {
-    glm(adherence ~ income_cat + ins_classif + race_6cat + age + educ_level + marital_status + alc_heavy + smoking_hx, 
+    glm(adherence ~ income_cat + ins_classif + race_6cat + age + educ_level + marital_status + alc_heavy + smoking_hx + alc_heavy + bmi_cat, 
         family = binomial(link = "logit"), 
         data = data)
   })
@@ -461,7 +459,7 @@ stratified_by_insurance <- subset_1168_data %>%
     valid_predictors <- predictors[sapply(data[, predictors], function(x) length(unique(x)) > 1)]
     
     if(length(valid_predictors) == length(predictors)) {
-      glm(adherence ~ income_cat + race_6cat + sex + age + educ_level + marital_status + alc_heavy + smoking_hx, 
+      glm(adherence ~ income_cat + race_6cat + sex + age + educ_level + marital_status + alc_heavy + smoking_hx + alc_heavy + bmi_cat, 
           family = binomial(link = "logit"), 
           data = data)
     } else {
@@ -475,7 +473,7 @@ stratified_by_insurance <- Filter(Negate(is.null), stratified_by_insurance)
 stratified_by_education <- subset_1168_data %>%
   split(.$educ_level) %>%
   lapply(function(data) {
-    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + marital_status + alc_heavy + smoking_hx, 
+    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + marital_status + alc_heavy + smoking_hx + alc_heavy + bmi_cat, 
         family = binomial(link = "logit"), 
         data = data)
   })
@@ -484,7 +482,7 @@ stratified_by_education <- subset_1168_data %>%
 stratified_by_marital <- subset_1168_data %>%
   split(.$marital_status) %>%
   lapply(function(data) {
-    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level + alc_heavy + smoking_hx, 
+    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level + alc_heavy + smoking_hx + alc_heavy + bmi_cat, 
         family = binomial(link = "logit"), 
         data = data)
   })
@@ -493,7 +491,7 @@ stratified_by_marital <- subset_1168_data %>%
 stratified_by_alcohol <- subset_1168_data %>%
   split(.$alc_heavy) %>%
   lapply(function(data) {
-    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level + marital_status + smoking_hx, 
+    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level + marital_status + smoking_hx + alc_heavy + bmi_cat, 
         family = binomial(link = "logit"), 
         data = data)
   })
@@ -502,11 +500,28 @@ stratified_by_alcohol <- subset_1168_data %>%
 stratified_by_tobacco <- subset_1168_data %>%
   split(.$smoking_hx) %>%
   lapply(function(data) {
-    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level + marital_status + alc_heavy, 
+    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level + marital_status + alc_heavy + alc_heavy + bmi_cat, 
         family = binomial(link = "logit"), 
         data = data)
   })
 
+# Stratified analysis by BMI
+stratified_by_bmi <- subset_1168_data %>%
+  split(.$bmi_cat) %>%
+  lapply(function(data) {
+    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level + marital_status + alc_heavy + cvd_hx, 
+        family = binomial(link = "logit"), 
+        data = data)
+  })
+
+# Stratified analysis by comorbid heart disease
+stratified_by_cvd <- subset_1168_data %>%
+  split(.$cvd_hx) %>%
+  lapply(function(data) {
+    glm(adherence ~ income_cat + ins_classif + race_6cat + sex + age + educ_level + marital_status + alc_heavy + bmi_cat, 
+        family = binomial(link = "logit"), 
+        data = data)
+  })
 # Output the summaries of the stratified analyses
 lapply(stratified_by_income, summary)
 ```
@@ -692,6 +707,13 @@ These results illustrate that the factors influencing medication adherence may v
 The stratified analyses for adherence to cholesterol medication across various demographic and behavioral groups revealed nuanced insights. Age consistently emerged as a significant factor, particularly among non-tobacco users and current tobacco users, indicating higher adherence with increasing age. Marital status showed significance in certain strata, hinting at the influence of social support systems on adherence. Notably, the influence of race varied across different tobacco usage groups, suggesting diverse adherence patterns among racial groups, especially among current tobacco users. Income, insurance status, and other socioeconomic factors, while included in the models, did not consistently show a significant impact across different strata. This highlights the complexity of medication adherence behavior, which appears to be influenced by a combination of demographic, socioeconomic, and personal behavior factors.
 
 
+```{r}
+lapply(stratified_by_bmi, summary)
+```
+
+```{r}
+lapply(stratified_by_cvd, summary)
+```
 
 ## Summary: 
 The comprehensive study on adherence to cholesterol medication encompassed multiple analytical approaches, revealing intricate patterns influenced by a blend of demographic, socioeconomic, and behavioral factors:
